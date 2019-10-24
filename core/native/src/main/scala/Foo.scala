@@ -3,8 +3,8 @@ import java.io.File
 import scala.compat.Platform
 import com.github.sqlite4s._
 
-import com.github.sqlite4s.c.util.CUtils
-import scala.scalanative.native.Zone
+/*import com.github.sqlite4s.c.util.CUtils
+import scala.scalanative.unsafe.Zone
 object Bytes2Hex {
   private val hexArray = "0123456789ABCDEF".toCharArray
 
@@ -22,7 +22,7 @@ object Bytes2Hex {
 
     new String(hexChars)
   }
-}
+}*/
 
 
 object Foo {
@@ -35,7 +35,7 @@ object Foo {
 
     println(s"Starting at ${Platform.currentTime}")
 
-    Zone { implicit z =>
+    /*Zone { implicit z =>
       val sql = "select x from x"
       val utf16Bytes = sql.getBytes(java.nio.charset.StandardCharsets.UTF_16)
       val utf16Sql = CUtils.bytesToCString(utf16Bytes)(z)
@@ -46,9 +46,9 @@ object Foo {
       println("fromCString:" + CUtils.fromCString(utf16Sql))
     }
 
-    return
+    return*/
 
-    Bar.create_dia_histogram(
+    /*Bar.create_dia_histogram(
       //new File("/mnt/d/Dev/wsl/ammonite/171121FFSWATH2000pg01.mzDB"),
       new File("/mnt/d/LCMS/quebec_dataset/UP_high_N4.raw.mzDB"),
       //new File("/mnt/d/LCMS/UPS1_50-5_small_runs/OVEMB150205_12.raw.mzDB"),
@@ -56,7 +56,7 @@ object Foo {
       0.1f
     )
 
-    println(s"Ending at ${Platform.currentTime}")
+    println(s"Ending at ${Platform.currentTime}")*/
   }
 
 

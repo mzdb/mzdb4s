@@ -34,19 +34,23 @@ class BytesReader(
     var spectrumSliceIdx = 0
     var byteIdx = 0
     while (byteIdx < _blobSize) { // Set the new position to access the byte buffer
+      //println(byteIdx)
       _bbByteBuffer.position(byteIdx)
 
       // Retrieve the spectrum id
       val spectrumId = _bbByteBuffer.getInt.toLong
+      //println("spectrumId",spectrumId)
       spectrumSliceStartPositions(spectrumSliceIdx) = byteIdx
 
       // Retrieve the number of peaks
       val peaksCount = _bbByteBuffer.getInt
       peaksCounts(spectrumSliceIdx) = peaksCount
+      //println("peaksCount",peaksCount)
 
       // Retrieve the DataEncoding corresponding to this spectrum
       val de = this.dataEncodingBySpectrumId(spectrumId)
       this.checkDataEncodingIsNotNull(de, spectrumId)
+      //println("de.getPeakStructSize",de.getPeakStructSize)
 
       // Skip the spectrum id, peaksCount and peaks (peaksCount * size of one peak)
       byteIdx += 8 + (peaksCount * de.getPeakStructSize)

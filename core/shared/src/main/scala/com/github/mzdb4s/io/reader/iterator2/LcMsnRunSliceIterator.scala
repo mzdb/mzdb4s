@@ -1,4 +1,4 @@
-/*package com.github.mzdb4s.io.reader.iterator2
+package com.github.mzdb4s.io.reader.iterator2
 
 import com.github.mzdb4s.AbstractMzDbReader
 import com.github.mzdb4s.io.MzDbContext
@@ -78,4 +78,4 @@ class LcMsnRunSliceIterator private (
       }
     )
   }
-}*/
+}

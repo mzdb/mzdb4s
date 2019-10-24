@@ -9,36 +9,47 @@ import thermo._
 class Activation() extends AbstractParamTree
 
 //@XmlType(name="AnalyzerComponent")
-class AnalyzerComponent() extends Component
+class AnalyzerComponent(order: Int) extends Component(order)
 
-class Component extends AbstractParamTree {
+class Component(
   //@XmlAttribute
-  protected var order = 0
+  var order: Int = 0
+) extends AbstractParamTree {
   def getOrder(): Int = order
 }
 
 //@XmlRootElement(name = "componentList")
-class ComponentList() extends AbstractParamTree {
+class ComponentList(
   //@XmlElements(Array(Array(new XmlElement(name = "detector", required = true, `type` = classOf[DetectorComponent]), new XmlElement(name = "analyzer", required = true, `type` = classOf[AnalyzerComponent]), new XmlElement(name = "source", required = true, `type` = classOf[SourceComponent]))))
   //@XmlElementWrapper
-  protected var components: Seq[Component] = null
+  var components: Seq[Component]
+) extends AbstractParamTree {
+
   //@XmlAttribute(required = true)
   //@XmlSchemaType(name = "nonNegativeInteger")
-  protected var count = 0
-
-  def this(c: Int) {
-    this()
-    this.count = c
-  }
+  def count: Int = components.length
 }
 
 //@XmlType(name = "DetectorComponent")
-class DetectorComponent extends Component {}
+class DetectorComponent(order: Int) extends Component(order) {}
 
 //@XmlRootElement(name = "isolationWindow")
 class IsolationWindowParamTree() extends AbstractParamTree
 
 //@XmlRootElement(name = "params")
+object ParamTree {
+  def apply(
+    cvParams: Seq[CVParam] = Seq.empty[CVParam],
+    userParams: Seq[UserParam] = Seq.empty[UserParam],
+    userTexts: Seq[UserText] = Seq.empty[UserText]
+  ): ParamTree = {
+    val paramTree = new ParamTree()
+    paramTree.setCVParams(cvParams)
+    paramTree.setUserParams(userParams)
+    paramTree.setUserTexts(userTexts)
+    paramTree
+  }
+}
 class ParamTree() extends AbstractParamTree
 
 //@XmlRootElement(name = "precursor")
@@ -132,4 +143,162 @@ class SelectedIonList() extends AbstractParamTree {
 }
 
 //@XmlType(name = "SourceComponent")
-class SourceComponent extends Component
+class SourceComponent(order: Int) extends Component(order)
+
+
+/*
+sealed trait IComponent extends IParamTree {
+  /** The order. */
+  def order: Int
+}
+
+case class AnalyzerComponent(
+  order: Int,
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IComponent
+
+case class DetectorComponent(
+  order: Int,
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IComponent
+
+case class SourceComponent(
+  order: Int,
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IComponent
+
+class ComponentListBuilder() {
+  private var order = 0
+  private val components = new collection.mutable.ArrayBuffer[IComponent]()
+
+  def addAnalyzerComponent(params: ParamTree): this.type = {
+    order += 1
+    AnalyzerComponent(order, params.cvParams, params.userParams, params.userTexts)
+    this
+  }
+
+  def addDetectorComponent(params: ParamTree): this.type = {
+    order += 1
+    DetectorComponent(order, params.cvParams, params.userParams, params.userTexts)
+    this
+  }
+
+  def addSourceComponent(params: ParamTree): this.type = {
+    order += 1
+    SourceComponent(order, params.cvParams, params.userParams, params.userTexts)
+    this
+  }
+
+  def toComponentList(): ComponentList = ComponentList(components)
+}
+
+case class ComponentList(components: Seq[IComponent]) {
+  //@XmlElements(Array(Array(new XmlElement(name = "detector", required = true, `type` = classOf[Nothing]), new XmlElement(name = "analyzer", required = true, `type` = classOf[AnalyzerComponent]), new XmlElement(name = "source", required = true, `type` = classOf[Nothing]))))
+  //@XmlElementWrapper protected var components: util.List[Nothing] = null
+  //@XmlAttribute(required = true)
+  //@XmlSchemaType(name = "nonNegativeInteger")
+
+  def count: Int = components.length
+}
+
+
+case class ScanList(
+  scans: List[ScanParamTree],
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree {
+  /*@XmlAttribute(required = true)
+  @XmlSchemaType(name = "nonNegativeInteger") protected var count = 0
+  @XmlElement(name = "scan")
+  protected var scans: util.List[ScanParamTree] = null*/
+
+  def count: Int = scans.length
+}
+
+case class ScanParamTree(
+  scanWindowList: List[ScanWindowList],
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree {
+
+  def getThermoMetaData(): Option[String] = {
+    val searchedAC = CVEntry.FILTER_STRING.toString
+    val filterStringCvParamOpt = this.cvParams.find(_.accession == searchedAC)
+    filterStringCvParamOpt.map(_.value)
+  }
+}
+
+case class ScanWindow(
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree
+
+
+case class ScanWindowList(
+  scanWindows: List[ScanWindow],
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree {
+  //@XmlAttribute(required = true)
+  //@XmlSchemaType(name = "nonNegativeInteger") protected var count = 0
+  //@XmlElementWrapper(name = "scanWindow")
+  //protected var scanWindows: util.List[ScanWindow] = null
+
+  def count: Int = scanWindows.length
+}
+
+
+case class Activation(
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree
+
+case class IsolationWindowParamTree(
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree
+
+case class SelectedIon(
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree
+
+case class SelectedIonList(
+  selectedIons: List[SelectedIon],
+  cvParams: List[CVParam],
+  userParams: List[UserParam],
+  userTexts: List[UserText]
+) extends IParamTree {
+
+  def count: Int = selectedIons.length
+}
+
+case class Precursor(
+  spectrumRef: String,
+  isolationWindow: IsolationWindowParamTree,
+  selectedIonList: SelectedIonList,
+  activation: Activation
+) {
+
+  def parseFirstSelectedIonMz(): Option[Double] = {
+    val sil = this.selectedIonList
+    val si = sil.selectedIons(0)
+    val cvAC = CVEntry.SELECTED_ION_MZ.toString
+    si.cvParams.find(_.accession == cvAC).map(_.value.toDouble)
+  }
+}
+
+*/

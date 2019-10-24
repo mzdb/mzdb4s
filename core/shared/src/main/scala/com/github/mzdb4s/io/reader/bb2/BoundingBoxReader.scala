@@ -19,23 +19,25 @@ object BoundingBoxReader {
   def apply(
     bbId: Int,
     bytes: Array[Byte],
+    runSliceId: Int,
     firstSpectrumId: Long,
     lastSpectrumId: Long,
     spectrumHeaderById: LongMap[SpectrumHeader],
     dataEncodingBySpectrumId: LongMap[DataEncoding]
   )(implicit bbIdxFactory: BoundingBoxIndexFactory): BoundingBoxBytesReader = {
-    new BoundingBoxBytesReader(bbId, bytes, firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId)
+    new BoundingBoxBytesReader(bbId, bytes, runSliceId, firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId)
   }
 
   def apply(
     bbId: Int,
     blob: ISQLiteBlob,
+    runSliceId: Int,
     firstSpectrumId: Long,
     lastSpectrumId: Long,
     spectrumHeaderById: LongMap[SpectrumHeader],
     dataEncodingBySpectrumId: LongMap[DataEncoding]
   )(implicit bbIdxFactory: BoundingBoxIndexFactory): BoundingBoxBlobReader = {
-    new BoundingBoxBlobReader(bbId, blob, firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId)
+    new BoundingBoxBlobReader(bbId, blob, runSliceId, firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId)
   }
 
 }

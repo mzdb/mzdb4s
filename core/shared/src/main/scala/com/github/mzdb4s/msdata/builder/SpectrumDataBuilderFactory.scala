@@ -4,21 +4,24 @@ import scala.collection.mutable.HashSet
 
 class SpectrumDataBuilderFactory() {
 
-  private val _releasedBuilders = new HashSet[SpectrumDataBuilder]
+  //private val _releasedBuilders = new HashSet[SpectrumDataBuilder]
 
   def acquireBuilder(minDataPointsCount: Int): SpectrumDataBuilder = {
-   val releasedBuilderOpt = _releasedBuilders.find(_.dataPointsCount >= minDataPointsCount)
+    new SpectrumDataBuilder(minDataPointsCount)
+
+   /*val releasedBuilderOpt = _releasedBuilders.find(_.dataPointsCount >= minDataPointsCount)
     if (releasedBuilderOpt.isEmpty) new SpectrumDataBuilder(minDataPointsCount)
     else {
       val releasedBuilder = releasedBuilderOpt.get
       _releasedBuilders -= releasedBuilder
       //println(s"Re-using previously created builder : minDataPointsCount=$minDataPointsCount ; dataPointsCount = ${releasedBuilder.dataPointsCount}")
       releasedBuilder
-    }
+    }*/
   }
 
-  def releaseBuilder(builder: SpectrumDataBuilder): Unit = {
+  // FIXME: this method call increase memory consumption rather than decreasing it
+  /*def releaseBuilder(builder: SpectrumDataBuilder): Unit = {
     _releasedBuilders += builder
-  }
+  }*/
 
 }

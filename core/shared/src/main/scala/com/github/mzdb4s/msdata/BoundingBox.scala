@@ -53,6 +53,17 @@ class BoundingBox(
   }
 }
 
+object DefaultBBSizes {
+  def apply(): BBSizes = {
+    BBSizes(
+      BB_MZ_HEIGHT_MS1 = 5,
+      BB_MZ_HEIGHT_MSn = 10000,
+      BB_RT_WIDTH_MS1 = 15,
+      BB_RT_WIDTH_MSn = 0
+    )
+  }
+}
+
 /**
   * Class holding bounding box dimensions that retrieved from the param_tree of the mzdb table.
   * We distinguish two sizes, one for ms1, the other one for all MSn.

@@ -6,7 +6,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import com.github.mzdb4s.db.model._
 import com.github.mzdb4s.db.model.params.param._
-import com.github.mzdb4s.db.table.BoundingBoxTable
+import com.github.mzdb4s.db.table.{BoundingBoxTable, SpectrumTable}
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.io.reader.MzDbReaderQueries
 import com.github.mzdb4s.io.reader.bb.BoundingBoxBuilder
@@ -104,12 +104,36 @@ abstract class AbstractMzDbReader {
     MzDbMetaData(
       mzDbHeader = this.mzDbHeader,
       dataEncodings = dataEncodings,
+      commonInstrumentParams = CommonInstrumentParams(1, params.ParamTree()), // FIXME: fill me
       instrumentConfigurations = this.getInstrumentConfigurations(),
+      processingMethods = Seq.empty[ProcessingMethod], // FIXME: fill me
       runs = this.getRuns(),
       samples = this.getSamples(),
       softwareList = this.getSoftwareList(),
       sourceFiles = this.getSourceFiles()
     )
+  }
+
+  protected def getSpectraXmlMetaData()(implicit mzDbCtx: MzDbContext): Seq[SpectrumXmlMetaData] = {
+    val spectraCount = MzDbReaderQueries.getSpectraCount()
+
+    val sqlString = "SELECT id, param_tree, scan_list, precursor_list, product_list FROM spectrum"
+    val records = mzDbCtx.newSQLiteQuery(sqlString)getRecordIterator()
+
+    val xmlMetaDataBuffer = new ArrayBuffer[SpectrumXmlMetaData](spectraCount)
+    while (records.hasNext) {
+      val r = records.next
+
+      xmlMetaDataBuffer += SpectrumXmlMetaData(
+        spectrumId = r.columnLong(SpectrumTable.ID),
+        paramTree = r.columnString(SpectrumTable.PARAM_TREE),
+        scanList = r.columnString(SpectrumTable.SCAN_LIST),
+        precursorList = Option(r.columnString(SpectrumTable.PRECURSOR_LIST)),
+        productList = Option(r.columnString(SpectrumTable.PRODUCT_LIST))
+      )
+    }
+
+    xmlMetaDataBuffer
   }
 
   protected def getRunSliceData(runSliceId: Int)(implicit mzDbCtx: MzDbContext): RunSliceData = {
@@ -207,7 +231,7 @@ abstract class AbstractMzDbReader {
     Spectrum(sh, sd)
   }
 
-  protected def getSpectrumPeaks(spectrumId: Int)(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  protected def getSpectrumPeaks(spectrumId: Int)(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     this.getSpectrum(spectrumId).toPeaks()
   }
 
@@ -514,7 +538,7 @@ abstract class AbstractMzDbReader {
         val record = recordIt.next
         val minMz = record.columnDouble("min_parent_mz")
         val maxMz = record.columnDouble("max_parent_mz")
-        isolationWindowList += IsolationWindow(minMz, maxMz)
+        isolationWindowList += IsolationWindow(minMz.toFloat, maxMz.toFloat, ((minMz + maxMz) / 2).toFloat)
       }
 
       this.diaIsolationWindows = isolationWindowList
@@ -542,7 +566,7 @@ abstract class AbstractMzDbReader {
     minMz: Double,
     maxMz: Double,
     method: XicMethod.Value
-  )(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  )(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     this.getMsXic(minMz, maxMz, -1, -1, method)
   }
 
@@ -552,7 +576,7 @@ abstract class AbstractMzDbReader {
     minRt: Float,
     maxRt: Float,
     method: XicMethod.Value
-  )(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  )(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     val mzCenter = (minMz + maxMz) / 2
     val mzTolInDa = maxMz - mzCenter
     this.getMsXic(mzCenter, mzTolInDa, minRt, maxRt, method)
@@ -564,7 +588,7 @@ abstract class AbstractMzDbReader {
     minRt: Float,
     maxRt: Float,
     method: XicMethod.Value
-  )(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  )(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     val minMz = mz - mzTolInDa
     val maxMz = mz + mzTolInDa
     val minRtForRtree = if (minRt >= 0) minRt else 0
@@ -583,7 +607,7 @@ abstract class AbstractMzDbReader {
     minRt: Float,
     maxRt: Float,
     method: XicMethod.Value
-  )(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  )(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     val minFragMz = fragmentMz - fragmentMzTolInDa
     val maxFragMz = fragmentMz + fragmentMzTolInDa
     val minRtForRtree = if (minRt >= 0) minRt else 0
@@ -600,15 +624,15 @@ abstract class AbstractMzDbReader {
     searchedMz: Double,
     mzTolPPM: Double,
     method: XicMethod.Value
-  ): Array[Peak] = {
+  ): Array[IPeak] = {
     require(spectrumSlices != null, "spectrumSlices is null")
 
     if (spectrumSlices.length == 0) { // logger.warn("Empty spectrumSlices, too narrow request ?");
-      return Array.empty[Peak]
+      return Array.empty[IPeak]
     }
 
     val spectrumSlicesCount = spectrumSlices.length
-    val xicPeaks = new ArrayBuffer[Peak](spectrumSlicesCount)
+    val xicPeaks = new ArrayBuffer[IPeak](spectrumSlicesCount)
 
     method match {
       case XicMethod.MAX =>
@@ -619,7 +643,9 @@ abstract class AbstractMzDbReader {
           val peaksCount = peaks.length
 
           if (peaksCount != 0) {
-            java.util.Arrays.sort(peaks, Peak.getIntensityComp())
+            //java.util.Arrays.sort(peaks, Peak.getIntensityComp())
+            scala.util.Sorting.quickSort(peaks)(Peak.getIntensityOrdering())
+
             xicPeaks += peaks(peaksCount - 1)
           }
 
@@ -649,7 +675,8 @@ abstract class AbstractMzDbReader {
           val peaksCount = peaks.length
 
           if (peaksCount != 0) {
-            java.util.Arrays.sort(peaks, Peak.getIntensityComp())
+            //java.util.Arrays.sort(peaks, Peak.getIntensityComp())
+            scala.util.Sorting.quickSort(peaks)(Peak.getIntensityOrdering())
 
             var sum = 0.0f
             for (p <- peaks) {
@@ -668,21 +695,21 @@ abstract class AbstractMzDbReader {
     xicPeaks.toArray
   }
 
-  protected def getMsPeaksInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float)(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  protected def getMsPeaksInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float)(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     val spectrumSlices = this.getMsSpectrumSlices(minMz, maxMz, minRt, maxRt)
     this._spectrumSlicesToPeaks(spectrumSlices)
   }
 
-  protected def getMsnPeaksInMzRtRanges(parentMz: Double, minFragMz: Double, maxFragMz: Double, minRt: Float, maxRt: Float)(implicit mzDbCtx: MzDbContext): Array[Peak] = {
+  protected def getMsnPeaksInMzRtRanges(parentMz: Double, minFragMz: Double, maxFragMz: Double, minRt: Float, maxRt: Float)(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
     val spectrumSlices = this.getMsnSpectrumSlices(parentMz, minFragMz, maxFragMz, minRt, maxRt)
     this._spectrumSlicesToPeaks(spectrumSlices)
   }
 
   /** Merge spectrum slices then return a peak array using simply the toPeaks function **/
-  private def _spectrumSlicesToPeaks(spectrumSlices: Array[SpectrumSlice]): Array[Peak] = {
+  private def _spectrumSlicesToPeaks(spectrumSlices: Array[SpectrumSlice]): Array[IPeak] = {
     //this.logger.debug("SpectrumSlice length : {}", spectrumSlices.length)
 
-    if (spectrumSlices.length == 0) return Array.empty[Peak]
+    if (spectrumSlices.length == 0) return Array.empty[IPeak]
 
     var mergedPeaksCount = 0
     for (spectrumSlice <- spectrumSlices) {
@@ -690,7 +717,7 @@ abstract class AbstractMzDbReader {
       mergedPeaksCount += sd.peaksCount
     }
 
-    val peaks = new Array[Peak](mergedPeaksCount)
+    val peaks = new Array[IPeak](mergedPeaksCount)
     var peakIdx = 0
     for (spectrumSlice <- spectrumSlices) {
       for (peak <- spectrumSlice.toPeaks()) {

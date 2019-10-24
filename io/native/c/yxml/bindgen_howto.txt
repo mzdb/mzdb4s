@@ -1,0 +1,3 @@
+cp /usr/lib/gcc/x86_64-linux-gnu/7/include/stddef.h stddef.h
+/home/cpk/tools/scala-native-bindgen-linux --name yxml yxml.h > yxml.scala
+rm stddef.h

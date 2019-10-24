@@ -7,17 +7,36 @@ import com.github.mzdb4s.util.ms.MsUtils
 
 import scala.collection.mutable.WrappedArray
 
-trait ISpectrumData {
+trait ISpectrumDataContainer extends Any {
+  def getMzAt(index: Int): Double
+  def getIntensityAt(index: Int): Float
+  def getLeftHwhmAt(index: Int): Option[Float]
+  def getRightHwhmAt(index: Int): Option[Float]
+  def getPeaksCount(): Int
+
+  def forEachPeak(lcContext: ILcContext)(peakConsumer: (IPeak, Int) => Unit): Unit
+  def getMinMz(): Double
+  def getMaxMz(): Double
+  def isEmpty(): Boolean
+}
+
+trait ISpectrumData extends ISpectrumDataContainer {
+  // Methods to be implemented
   def mzList: Seq[Double]
   def intensityList: Seq[Float]
   def leftHwhmList: Seq[Float]
   def rightHwhmList: Seq[Float]
   def peaksCount: Int
+  //def toPeaks[T <: IPeak](lcContext: ILcContext): Array[T]
+  def toPeaks(lcContext: ILcContext): Array[IPeak]
 
-  def isEmpty(): Boolean
-
-  def toPeaks(lcContext: ILcContext): Array[Peak]
-  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): Peak
+  // Implemented methods
+  def getMzAt(index: Int): Double = mzList(index)
+  def getIntensityAt(index: Int): Float = intensityList(index)
+  def getLeftHwhmAt(index: Int): Option[Float] = if (leftHwhmList != null) Some(leftHwhmList(index)) else None
+  def getRightHwhmAt(index: Int): Option[Float] = if (rightHwhmList != null) Some(rightHwhmList(index)) else None
+  def getPeaksCount(): Int = peaksCount
+  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): IPeak
 }
 
 abstract class AbstractSpectrumData extends ISpectrumData {
@@ -68,15 +87,33 @@ case class SpectrumData(
     this(mzList, intensityList, null, null)
   }
 
-  def getPeaksCount(): Int = peaksCount
+  def forEachPeak(lcContext: ILcContext)(peakConsumer: (IPeak, Int) => Unit): Unit = {
+
+    var i = 0
+    while (i < peaksCount) {
+
+      var leftHwhm = 0f
+      var rightHwhm = 0f
+
+      if (leftHwhmList != null && rightHwhmList != null) {
+        leftHwhm = leftHwhmList(i)
+        rightHwhm = rightHwhmList(i)
+      }
+
+      peakConsumer.apply(Peak(mzList(i), intensityList(i), leftHwhm, rightHwhm, lcContext), i)
+
+      i += 1
+    }
+
+  }
 
   /**
     * To peaks. A new peaks array is instantiated for each call.
     *
     * @return the peak[]
     */
-  def toPeaks(lcContext: ILcContext): Array[Peak] = {
-    val peaks = new Array[Peak](peaksCount)
+  def toPeaks(lcContext: ILcContext): Array[IPeak] = {
+    val peaks = new Array[IPeak](peaksCount)
 
     val mzArray = mzList.array
     val intensityArray = intensityList.array
@@ -96,24 +133,6 @@ case class SpectrumData(
     }
 
     peaks
-  }
-
-  def forEachPeak(lcContext: ILcContext, peakConsumer: (Peak, Int) => Unit): Unit = {
-    var i = 0
-    while (i < peaksCount) {
-
-      var leftHwhm = 0f
-      var rightHwhm = 0f
-
-      if (leftHwhmList != null && rightHwhmList != null) {
-        leftHwhm = leftHwhmList(i)
-        rightHwhm = rightHwhmList(i)
-      }
-
-      peakConsumer.apply(Peak(mzList(i), intensityList(i), leftHwhm, rightHwhm, lcContext), i)
-
-      i += 1
-    }
   }
 
   /*
@@ -144,7 +163,7 @@ case class SpectrumData(
   }
 
   /** assuming mzList is sorted */
-  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): Peak = {
+  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): IPeak = {
     if (peaksCount == 0) return null
 
     val myMzList = this.mzList.array

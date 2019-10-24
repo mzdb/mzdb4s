@@ -6,5 +6,5 @@ import com.github.mzdb4s.util.atomic.InMemoryIdGen
 
 case class RunSliceData(
   @BeanProperty val id: Int,
-  @BeanProperty val spectrumSliceList: Array[SpectrumSlice]
+  @BeanProperty val spectrumSliceList: Seq[SpectrumSlice]
 ) extends InMemoryIdGen

@@ -26,7 +26,7 @@ abstract class AbstractTableModel[IdType] protected(
     if (!this.hasParamTree) _paramTree = mzdbCtx.loadParamTree(this.tableName())
     _paramTree
   }
-  def getParamTree(): ParamTree = _paramTree
+  def getParamTree(): Option[ParamTree] = Option(_paramTree)
 
   def setParamTree(paramTree: ParamTree): this.type = {
     this._paramTree = paramTree

@@ -49,7 +49,7 @@ abstract class AbstractParamTree extends IParamContainer {
     this.userTexts
   }
 
-  def setCvParams(cvParams: Seq[CVParam]): Unit = this.cvParams = cvParams
+  def setCVParams(cvParams: Seq[CVParam]): Unit = this.cvParams = cvParams
 
   def setUserParams(userParams: Seq[UserParam]): Unit = this.userParams = userParams
 

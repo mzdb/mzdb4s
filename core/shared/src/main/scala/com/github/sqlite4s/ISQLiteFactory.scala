@@ -32,6 +32,8 @@ trait ISQLiteConnection extends Any {
   //def prepare(sql: SQLParts, cached: Boolean): SQLiteStatement
   //def prepare(sql: SQLParts, flags: Int): SQLiteStatement
   def blob(table: String, column: String, rowid: Long, writeAccess: Boolean): ISQLiteBlob
+  def getAutoCommit(): Boolean
+  def getLastInsertId(): Long
   //def getStatementCount(): Int
 }
 

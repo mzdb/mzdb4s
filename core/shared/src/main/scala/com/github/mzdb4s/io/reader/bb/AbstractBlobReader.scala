@@ -10,11 +10,11 @@ import com.github.mzdb4s.msdata._
   * @author David Bouyssie
   * @see IBlobReader
   */
-object AbstractBlobReader {
+/*object AbstractBlobReader {
   /** Size of structure depending on selected dataMode **/
   private[bb] val FITTED = 20
   private[bb] val CENTROID = 12
-}
+}*/
 
 abstract class AbstractBlobReader /*protected(
   val firstSpectrumId: Long,

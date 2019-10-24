@@ -1,7 +1,9 @@
 package com.github.mzdb4s.io.reader.bb2
 
+import scala.collection.mutable.Buffer
 import scala.collection.mutable.WrappedArray
 
+import com.github.mzdb4s.msdata.SpectrumSlice
 import com.github.mzdb4s.msdata.builder._
 
 /**
@@ -13,6 +15,7 @@ import com.github.mzdb4s.msdata.builder._
 trait IBoundingBoxReader {
 
   def bbId: Int
+  def runSliceId: Int
   def firstSpectrumId: Long
   def lastSpectrumId: Long
 
@@ -32,25 +35,24 @@ trait IBoundingBoxReader {
     */
   def getSpectrumIdAt(idx: Int): Long
 
+  def getPeaksCountAt(idx: Int): Int
+
   /**
     * @return the ids of all spectra contained in the bounding box
     */
   def getAllSpectraIds(spectraIds: WrappedArray[Long]): Unit
 
-  /**
-    *
-    * @param idx index of specified spectrum
-    * @return SpectrumData of the specified spectrum
-    */
   def readSpectrumSliceDataAt(idx: Int, builder: ISpectrumDataAdder): Unit
 
   def readFilteredSpectrumSliceDataAt(idx: Int, minMz: Double, maxMz: Double, builder: ISpectrumDataAdder): Unit
 
-  def readAllSpectrumSlices(builders: Seq[ISpectrumDataAdder]): Unit
+  def readSpectrumSliceAt(idx: Int)(implicit sdbFactory: SpectrumDataBuilderFactory): SpectrumSlice
+
+  def readAllSpectrumSlicesData(builders: Seq[ISpectrumDataAdder]): Unit
+
+  def readAllSpectrumSlices(buffer: Buffer[SpectrumSlice])(implicit sdbFactory: SpectrumDataBuilderFactory): Unit
 }
 
 trait IByteBufferAsInts extends Any {
   def apply(bytesIndex: Int)(implicit bbIdxFactory: BoundingBoxIndexFactory): Int
-  //def next(): Int
-  //def position(byteIndex: Int): Unit
 }

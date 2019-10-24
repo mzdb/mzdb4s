@@ -36,7 +36,7 @@ private[param] object ParamTreeParserImpl {
       val cvParams = cvParamsTreeOpt.get.filterChildren(_.tagName == "cvParam").map { cvParam =>
         _parseCvParam(cvParam.attributes)
       }
-      paramTree.setCvParams(cvParams)
+      paramTree.setCVParams(cvParams)
     }
 
     if (userParamsTreeOpt.isDefined) {
@@ -48,7 +48,11 @@ private[param] object ParamTreeParserImpl {
 
     if (userTextsTreeOpt.isDefined) {
       val userTexts = userTextsTreeOpt.get.filterChildren(_.tagName == "userText").map { userText =>
-        _parseUserText(userText.attributes)
+        val textOpt = userText.children.collectFirst {
+          case pine.Text(t) => t
+        }
+
+        _parseUserText(userText.attributes, textOpt.getOrElse(""))
       }
       paramTree.setUserTexts(userTexts)
     }
@@ -56,31 +60,38 @@ private[param] object ParamTreeParserImpl {
     paramTree
   }
 
-  private def _parseAbstractParam[T <: AbstractParam](attributes: collection.Map[String,String], param: T): T = {
+  /*private def _parseAbstractParam[T <: AbstractParam](attributes: collection.Map[String,String], param: T): T = {
     param
       .setCvRef(attributes.get("cvRef").orNull)
       .setAccession(attributes.get("accession").orNull)
       .setName(attributes.get("name").orNull)
-  }
+  }*/
 
   private def _parseCvParam(attributes: collection.Map[String,String]): CVParam = {
-    _parseAbstractParam(attributes, new CVParam())
-      .setValue(attributes.get("value").orNull)
-      .setUnitCvRef(attributes.get("unitCvRef").orNull)
-      .setUnitAccession(attributes.get("unitAccession").orNull)
-      .setUnitName(attributes.get("unitName").orNull)
+    CVParam(
+      accession = attributes.get("accession").orNull,
+      name = attributes.get("name").orNull,
+      value = attributes.get("value").orNull,
+      cvRef = attributes.get("cvRef").orNull,
+      unitCvRef = attributes.get("unitCvRef"),
+      unitAccession = attributes.get("unitAccession"),
+      unitName = attributes.get("unitName")
+    )
   }
 
   private def _parseUserParam(attributes: collection.Map[String,String]): UserParam = {
-    _parseAbstractParam(attributes, new UserParam())
-      .setValue(attributes.get("value").orNull)
-      .setType(attributes.get("type").orNull)
+    UserParam(
+      name = attributes.get("name").orNull,
+      value = attributes.get("value").orNull,
+      `type` = attributes.get("type").orNull
+    )
   }
 
-  private def _parseUserText(attributes: collection.Map[String,String]): UserText = {
-    _parseAbstractParam(attributes, new UserText())
-      .setText(attributes.get("value").orNull)
-      .setType(attributes.get("type").orNull)
+  private def _parseUserText(attributes: collection.Map[String,String], content: String): UserText = {
+    UserText(
+      name = attributes.get("name").orNull,
+      content = content
+    )
   }
 
   @inline

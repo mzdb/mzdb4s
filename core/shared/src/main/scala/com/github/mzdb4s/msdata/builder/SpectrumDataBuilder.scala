@@ -111,7 +111,9 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
     leftHwhmList: Seq[Float],
     rightHwhmList: Seq[Float]
   ): this.type = {
+
     var nDataPoints = mzList.length
+
     var i = 0
     if (leftHwhmList != null && rightHwhmList != null) {
       while (i < nDataPoints) {
@@ -125,12 +127,6 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
       }
     }
 
-    /*this._mzList ++= mzList
-    this._intensityList ++= intensityList
-    if (leftHwhmList != null && rightHwhmList != null) {
-      this._leftHwhmList ++= leftHwhmList
-      this._rightHwhmList ++= rightHwhmList
-    }*/
     this
   }
 
@@ -152,24 +148,6 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
       SpectrumData(_mzList, _intensityList, _leftHwhmList, _rightHwhmList)
     } else {
 
-      // Create new arrays
-      /*val mzList = new Array[Double](_index)
-      val intensityList = new Array[Float](_index)
-      val leftHwhmList: Array[Float] = null
-      val rightHwhmList: Array[Float] = null
-
-      System.arraycopy(_mzList, 0, mzList, 0, _index)
-      System.arraycopy(_intensityList, 0, intensityList, 0, _index)
-
-      if (_leftHwhmList != null) {
-        val leftHwhmList = new Array[Float](_index)
-        val rightHwhmList = new Array[Float](_index)
-        System.arraycopy(_leftHwhmList, 0, leftHwhmList, 0, _index)
-        System.arraycopy(_rightHwhmList, 0, rightHwhmList, 0, _index)
-      }
-
-      SpectrumData(mzList, intensityList, leftHwhmList, rightHwhmList)*/
-
       SpectrumData(
         new ResizedArray.ofDouble(_mzList, _index),
         new ResizedArray.ofFloat(_intensityList, _index),
@@ -187,87 +165,4 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
     this._index = 0
   }
 
-  /*def reset(adjustInitialSize: Boolean = true): Unit = {
-
-    // Adjust the initial size
-    if (adjustInitialSize)
-      this.initialSize = math.max(this.initialSize,_mzList.length)
-
-    // Create new arrays
-    this._mzList = new Array[Double](initialSize)
-    this._intensityList = new Array[Float](initialSize)
-    this._leftHwhmList = new Array[Float](initialSize)
-    this._rightHwhmList = new Array[Float](initialSize)
-  }*/
 }
-
-/*
-
-class SpectrumDataBuilder(var initialSize: Int, var adjustInitialSize: Boolean = true) extends AbstractSpectrumDataBuilder {
-
-  @inline
-  private def _newArrayBuilderOfDouble(size: Int): ArrayBuilder[Double] = {
-    val ab = new mutable.ArrayBuilder.ofDouble(); ab.sizeHint(size)
-    ab
-  }
-  @inline
-  private def _newArrayBuilderOfFloat(size: Int): ArrayBuilder[Float] = {
-    val ab = new mutable.ArrayBuilder.ofFloat(); ab.sizeHint(size)
-    ab
-  }
-
-  private var _mzList = _newArrayBuilderOfDouble(initialSize)
-  private var _intensityList = _newArrayBuilderOfFloat(initialSize)
-  private var _leftHwhmList = _newArrayBuilderOfFloat(initialSize)
-  private var _rightHwhmList = _newArrayBuilderOfFloat(initialSize)
-
-  _mzList.
-  @inline
-  def addData(
-    mzList: Seq[Double],
-    intensityList: Seq[Float],
-    leftHwhmList: Seq[Float],
-    rightHwhmList: Seq[Float]
-  ): this.type = {
-    this._mzList ++= mzList
-    this._intensityList ++= intensityList
-    if (leftHwhmList != null && rightHwhmList != null) {
-      this._leftHwhmList ++= leftHwhmList
-      this._rightHwhmList ++= rightHwhmList
-    }
-    this
-  }
-
-  @inline
-  def addSpectrumData(spectrumData: ISpectrumData): this.type = {
-    if (spectrumData != null) {
-      this.addData(
-        spectrumData.mzList,
-        spectrumData.intensityList,
-        spectrumData.leftHwhmList,
-        spectrumData.rightHwhmList
-      )
-    }
-    this
-  }
-
-  def result(): SpectrumData = {
-    // Create a new SpectrumData
-    val newSpectrumData = SpectrumData(_mzList.result(), _intensityList, _leftHwhmList, _rightHwhmList)
-
-    // Adjust the initial size
-    /*if (adjustInitialSize)
-      this.initialSize = math.max(this.initialSize,_mzList.length)
-
-    // Create new arrays
-    this._mzList = new Array[Double](initialSize)
-    this._intensityList = new Array[Float](initialSize)
-    this._leftHwhmList = new Array[Float](initialSize)
-    this._rightHwhmList = new Array[Float](initialSize)*/
-
-    newSpectrumData
-  }
-}
-
-
- */

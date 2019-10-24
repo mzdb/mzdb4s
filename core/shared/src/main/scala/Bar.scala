@@ -1,7 +1,9 @@
-import java.io.File
+import java.io.{File, PrintWriter}
 
 import com.github.mzdb4s.MzDbReader
 import com.github.sqlite4s._
+
+import scala.collection.mutable
 
 object Bar {
   val a = 42
@@ -53,11 +55,11 @@ object Bar {
       i += 1
     }*/
 
-    val specIter2 = new com.github.mzdb4s.io.reader.iterator2.SpectrumIterator(mzDb)
+    /*val specIter2 = new com.github.mzdb4s.io.reader.iterator2.SpectrumIterator(mzDb)
 
     try {
       var i = 0
-      while (specIter2.hasNext) {
+      while (specIter2.hasNext()) {
         //print(".")
         val spectrum = specIter2.next()
         //specIter2.releaseSpectrumData(spectrum.header.id)
@@ -71,33 +73,60 @@ object Bar {
         Thread.sleep(2000)
         throw t
       }
-    }
+    }*/
 
-    mzDb.close()
+    /*val runSliceIter2 = new com.github.mzdb4s.io.reader.iterator.LcMsRunSliceIterator(mzDb)
 
-    Thread.sleep(2000)
+    try {
+      var i = 0
+      while (runSliceIter2.hasNext()) {
+        val runSlice = runSliceIter2.next()
 
-    /*val printWriter = new PrintWriter(outputFile)
+        i += 1
+      }
+    } catch {
+      case t: Throwable => {
+        println("caught error: " + t.getMessage)
+        Thread.sleep(2000)
+        throw t
+      }
+    }*/
+
+
+    val printWriter = new PrintWriter(outputFile)
 
     val diaWindows = mzDb.getDIAIsolationWindows()
     println(s"Found ${diaWindows.length} DIA windows")
 
+    val ticByMzIdx = new mutable.LongMap[Float]()
+
     for (diaWindow <- diaWindows) {
       val rsIter = mzDb.getLcMsnRunSliceIterator(diaWindow.getMinMz(),diaWindow.getMaxMz())
 
-      val ticByMzIdx = new mutable.LongMap[Float]()
+      ticByMzIdx.clear()
+
       while (rsIter.hasNext()) {
 
         val runSlice = rsIter.next()
         val rsData = runSlice.getData()
         val spectrumSlices = rsData.getSpectrumSliceList()
 
-        for( spectrumSlice <- spectrumSlices; peak <- spectrumSlice.toPeaks() ) {
-          val peakIdx = (peak.getMz() / binSize).toInt
+        for( spectrumSlice <- spectrumSlices ) {
+          val sd = spectrumSlice.data
+          val peaksCount = sd.peaksCount
 
-          // Update TIC value
-          val newTic = ticByMzIdx.get(peakIdx).map( _ + peak.getIntensity() ).getOrElse(0f)
-          ticByMzIdx( peakIdx ) = newTic
+          var i = 0
+          while (i < peaksCount) {
+            val mz = sd.mzList(i)
+            val intensity = sd.intensityList(i)
+            val peakIdx = (mz / binSize).toInt
+
+            // Update TIC value
+            val newTic = ticByMzIdx.get(peakIdx).map( _ + intensity ).getOrElse(0f)
+            ticByMzIdx( peakIdx ) = newTic
+
+            i += 1
+          }
         }
       }
 
@@ -109,7 +138,7 @@ object Bar {
 
     printWriter.close()
 
-     mzDb.close()
-    */
+    mzDb.close()
+
   }
 }

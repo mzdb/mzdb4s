@@ -14,6 +14,7 @@ import com.github.mzdb4s.msdata.builder.SpectrumDataBuilder
 object SpectrumIterator {
   //private val allMsLevelsSqlQuery = "SELECT bounding_box.* FROM bounding_box, spectrum WHERE spectrum.id = bounding_box.first_spectrum_id"
   //private val singleMsLevelSqlQuery = allMsLevelsSqlQuery + " AND spectrum.ms_level= ?"
+  // FIXME: find the most appropriate query
   private val allMsLevelsSqlQuery = "SELECT * FROM bounding_box"
   private val singleMsLevelSqlQuery = "SELECT bounding_box.* FROM bounding_box, spectrum WHERE spectrum.id = bounding_box.first_spectrum_id AND spectrum.ms_level= ?"
   private val PRIORITY_QUEUE_INITIAL_CAPACITY = 200
@@ -113,7 +114,7 @@ class SpectrumIterator protected (
           if (usePriorityQueue) { // Put the loaded spectra in the priority queue
             val nextMsLevel = nextSH.getMsLevel
             // Check if we need to continue loading the spectrum slices
-            if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1)
+            if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1 || nextSH.id < curSH.id)
               continueSlicesLoading = true
           }
         }

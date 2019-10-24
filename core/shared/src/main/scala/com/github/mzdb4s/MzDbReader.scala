@@ -95,6 +95,8 @@ class MzDbReader(
 
   def getMetaData(): MzDbMetaData = super.createMetaData(_dataEncodingReader.getDataEncodings())
 
+  def getSpectraXmlMetaData(): Seq[SpectrumXmlMetaData] = super.getSpectraXmlMetaData()
+
   /**
     * Close the connection to avoid memory leaks.
     */
@@ -174,7 +176,7 @@ class MzDbReader(
 
   def getSpectrum(spectrumId: Long): Spectrum = super.getSpectrum(spectrumId)
 
-  def getSpectrumPeaks(spectrumId: Int): Array[Peak] = super.getSpectrumPeaks(spectrumId)
+  def getSpectrumPeaks(spectrumId: Int): Array[IPeak] = super.getSpectrumPeaks(spectrumId)
 
   def getMsSpectrumSlices(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float): Array[SpectrumSlice] = {
     super.getMsSpectrumSlices(minMz, maxMz, minRt, maxRt)
@@ -257,15 +259,15 @@ class MzDbReader(
     this.sourceFiles
   }
 
-  def getMsXicInMzRange(minMz: Double, maxMz: Double, method: XicMethod.Value): Array[Peak] = super.getMsXicInMzRange(minMz, maxMz, method)
+  def getMsXicInMzRange(minMz: Double, maxMz: Double, method: XicMethod.Value): Array[IPeak] = super.getMsXicInMzRange(minMz, maxMz, method)
 
-  def getMsXicInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float, method: XicMethod.Value): Array[Peak] = super.getMsXicInMzRtRanges(minMz, maxMz, minRt, maxRt, method)
+  def getMsXicInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float, method: XicMethod.Value): Array[IPeak] = super.getMsXicInMzRtRanges(minMz, maxMz, minRt, maxRt, method)
 
-  def getMsXic(mz: Double, mzTolInDa: Double, minRt: Float, maxRt: Float, msLevel: Int, method: XicMethod.Value): Array[Peak] = super.getMsXic(mz, mzTolInDa, minRt, maxRt, method)
+  def getMsXic(mz: Double, mzTolInDa: Double, minRt: Float, maxRt: Float, msLevel: Int, method: XicMethod.Value): Array[IPeak] = super.getMsXic(mz, mzTolInDa, minRt, maxRt, method)
 
-  def getMsnXIC(parentMz: Double, fragmentMz: Double, fragmentMzTolInDa: Double, minRt: Float, maxRt: Float, method: XicMethod.Value): Array[Peak] = super.getMsnXic(parentMz, fragmentMz, fragmentMzTolInDa, minRt, maxRt, method)
+  def getMsnXIC(parentMz: Double, fragmentMz: Double, fragmentMzTolInDa: Double, minRt: Float, maxRt: Float, method: XicMethod.Value): Array[IPeak] = super.getMsnXic(parentMz, fragmentMz, fragmentMzTolInDa, minRt, maxRt, method)
 
-  def getMsPeaksInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float): Array[Peak] = super.getMsPeaksInMzRtRanges(minMz, maxMz, minRt, maxRt)
+  def getMsPeaksInMzRtRanges(minMz: Double, maxMz: Double, minRt: Float, maxRt: Float): Array[IPeak] = super.getMsPeaksInMzRtRanges(minMz, maxMz, minRt, maxRt)
 
-  def getMsnPeaksInMzRtRanges(parentMz: Double, minFragMz: Double, maxFragMz: Double, minRt: Float, maxRt: Float): Array[Peak] = super.getMsnPeaksInMzRtRanges(parentMz, minFragMz, maxFragMz, minRt, maxRt)
+  def getMsnPeaksInMzRtRanges(parentMz: Double, minFragMz: Double, maxFragMz: Double, minRt: Float, maxRt: Float): Array[IPeak] = super.getMsnPeaksInMzRtRanges(parentMz, minFragMz, maxFragMz, minRt, maxRt)
 }

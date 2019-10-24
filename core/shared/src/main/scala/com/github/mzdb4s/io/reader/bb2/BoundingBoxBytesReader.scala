@@ -1,12 +1,10 @@
 package com.github.mzdb4s.io.reader.bb2
 
 import java.nio.ByteBuffer
-import java.util
 
 import com.github.mzdb4s.msdata._
-import com.github.mzdb4s.msdata.builder.ISpectrumDataAdder
+import com.github.mzdb4s.msdata.builder._
 
-import scala.collection.{IndexedSeq, Iterator, SeqLike}
 import scala.collection.mutable.LongMap
 
 /**
@@ -16,6 +14,7 @@ import scala.collection.mutable.LongMap
 class BoundingBoxBytesReader(
   val bbId: Int,
   private val bytes: Array[Byte],
+  val runSliceId: Int,
   val firstSpectrumId: Long,
   val lastSpectrumId: Long,
   val spectrumHeaderById: LongMap[SpectrumHeader],

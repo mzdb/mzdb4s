@@ -3,8 +3,9 @@ package com.github.mzdb4s.msdata
 import scala.beans.BeanProperty
 
 case class IsolationWindow(
-  @BeanProperty minMz: Double,
-  @BeanProperty maxMz: Double
+  @BeanProperty minMz: Float,
+  @BeanProperty maxMz: Float,
+  @BeanProperty targetMz: Float
 ) {
   //TODO: DBO => remove ne (not necessary anymore with a case class)
   /*override def hashCode: Int = {

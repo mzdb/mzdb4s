@@ -1,10 +1,8 @@
 package com.github.mzdb4s.util.date
 
-import com.github.sqlite4s.c.util.CUtils
-
-import scala.scalanative.native._
+import scala.scalanative.unsafe._
 import scala.scalanative.posix.time
-import scala.scalanative.native.string
+import scala.scalanative.libc.string
 
 // FIXME: use time.strptime when available in the SN library that we use
 @extern
@@ -18,8 +16,10 @@ object DateParser {
 
     string.memset(tm_ptr.asInstanceOf[Ptr[Byte]], 0, sizeof[time.time_t])
 
-    Zone { implicit z =>
-      time_ext.strptime(CUtils.toCString(dateStr), c"%Y-%m-%dT%H:%M:%SZ", tm_ptr) //"yyyy-MM-dd'T'HH:mm:ss'Z'"
+    scala.scalanative.unsafe.Zone { implicit z =>
+      // FIXME: calling CUtils.toCString doesn't work anymore in SN v0.4
+      //time_ext.strptime(CUtils.toCString(dateStr), c"%Y-%m-%dT%H:%M:%SZ", tm_ptr) //"yyyy-MM-dd'T'HH:mm:ss'Z'"
+      time_ext.strptime(toCString(dateStr)(z), c"%Y-%m-%dT%H:%M:%SZ", tm_ptr) //"yyyy-MM-dd'T'HH:mm:ss'Z'"
     }
 
     val timeSinceEpoch = time.mktime(tm_ptr).asInstanceOf[time.time_t]

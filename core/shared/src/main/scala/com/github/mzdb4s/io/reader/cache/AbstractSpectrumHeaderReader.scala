@@ -1,12 +1,11 @@
 package com.github.mzdb4s.io.reader.cache
 
 import scala.collection.mutable.{ArrayBuffer, LongMap}
-
 import com.github.mzdb4s.AbstractMzDbReader
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.io.reader.MzDbReaderQueries
 import com.github.mzdb4s.io.reader.param.ParamTreeParser
-import com.github.mzdb4s.msdata.{PeakEncoding, SpectrumHeader}
+import com.github.mzdb4s.msdata.{ActivationType, PeakEncoding, SpectrumHeader}
 import com.github.sqlite4s.ISQLiteRecordExtraction
 import com.github.sqlite4s.query.SQLiteRecord
 
@@ -21,7 +20,7 @@ object AbstractSpectrumHeaderReader {
   protected val TIME_INDEX_WIDTH = 15
 
   // Define some variable for spectrum header extraction
-  private val _spectrumHeaderQueryStr = "SELECT id, initial_id, cycle, time, ms_level, tic, base_peak_mz, base_peak_intensity, main_precursor_mz, main_precursor_charge, data_points_count, param_tree, scan_list, precursor_list, data_encoding_id, bb_first_spectrum_id FROM spectrum"
+  private val _spectrumHeaderQueryStr = "SELECT id, initial_id, title, cycle, time, ms_level, activation_type, tic, base_peak_mz, base_peak_intensity, main_precursor_mz, main_precursor_charge, data_points_count, param_tree, scan_list, precursor_list, data_encoding_id, bb_first_spectrum_id FROM spectrum"
   private val _ms1SpectrumHeaderQueryStr = _spectrumHeaderQueryStr + " WHERE ms_level = 1"
   private val _ms2SpectrumHeaderQueryStr = _spectrumHeaderQueryStr + " WHERE ms_level = 2"
   private val _ms3SpectrumHeaderQueryStr = _spectrumHeaderQueryStr + " WHERE ms_level = 3"
@@ -29,9 +28,11 @@ object AbstractSpectrumHeaderReader {
   protected object SpectrumHeaderCol extends Enumeration {
     val ID = Value("id")
     val INITIAL_ID = Value("initial_id")
+    val TITLE = Value("title")
     val CYCLE = Value("cycle")
     val TIME = Value("time")
     val MS_LEVEL = Value("ms_level")
+    val ACTIVATION_TYPE = Value("activation_type")
     val TIC = Value("tic")
     val BASE_PEAK_MZ = Value("base_peak_mz")
     val BASE_PEAK_INTENSITY = Value("base_peak_intensity")
@@ -57,9 +58,11 @@ object AbstractSpectrumHeaderReader {
     // FIXME: check that enum ids are the right indexes
     private[cache] val id = ID.id
     private[cache] val initialId = INITIAL_ID.id
-    private[cache] val cycleCol = CYCLE.id
+    private[cache] val title = TITLE.id
+    private[cache] val cycle = CYCLE.id
     private[cache] val time = TIME.id
     private[cache] val msLevel = MS_LEVEL.id
+    private[cache] val activationType = ACTIVATION_TYPE.id
     private[cache] val tic = TIC.id
     private[cache] val basePeakMz = BASE_PEAK_MZ.id
     private[cache] val basePeakIntensity = BASE_PEAK_INTENSITY.id
@@ -93,12 +96,17 @@ abstract class AbstractSpectrumHeaderReader(
       def extractRecord(record: SQLiteRecord): SpectrumHeader = {
         val stmt = record.getStatement
         val msLevel = stmt.columnInt(SpectrumHeaderColIdx.msLevel)
+        val activationTypeOpt = if (msLevel == 1) None
+        else {
+          val activationTypeAsStr = stmt.columnString(SpectrumHeaderColIdx.activationType)
+          Some(ActivationType.withName(activationTypeAsStr))
+        }
 
-        var precursorMz = 0.0
-        var precursorCharge = 0
+        var precursorMz = Option.empty[Double]
+        var precursorCharge = Option.empty[Int]
         if (msLevel >= 2) {
-          precursorMz = stmt.columnDouble(SpectrumHeaderColIdx.mainPrecursorMz)
-          precursorCharge = stmt.columnInt(SpectrumHeaderColIdx.mainPrecursorCharge)
+          precursorMz = Some(stmt.columnDouble(SpectrumHeaderColIdx.mainPrecursorMz))
+          precursorCharge = Some(stmt.columnInt(SpectrumHeaderColIdx.mainPrecursorCharge))
         }
 
         val bbFirstSpectrumId = stmt.columnInt(SpectrumHeaderColIdx.bbFirstSpectrumId)
@@ -109,9 +117,11 @@ abstract class AbstractSpectrumHeaderReader(
         val sh = new SpectrumHeader(
           stmt.columnLong(SpectrumHeaderColIdx.id),
           stmt.columnInt(SpectrumHeaderColIdx.initialId),
-          stmt.columnInt(SpectrumHeaderColIdx.cycleCol),
+          stmt.columnString(SpectrumHeaderColIdx.title),
+          stmt.columnInt(SpectrumHeaderColIdx.cycle),
           stmt.columnDouble(SpectrumHeaderColIdx.time).toFloat,
           msLevel,
+          activationTypeOpt,
           stmt.columnInt(SpectrumHeaderColIdx.dataPointsCount),
           isHighRes,
           stmt.columnDouble(SpectrumHeaderColIdx.tic).toFloat,

@@ -22,21 +22,16 @@ class SpectrumIterator protected (
   boundingBoxIterator: BoundingBoxIterator
 )(implicit mzDbCtx: MzDbContext) extends AbstractSpectrumSliceIterator(boundingBoxIterator) with java.util.Iterator[Spectrum] {
 
-  // TODO: provide this???
   protected val spectrumDataBuilderFactory = new SpectrumDataBuilderFactory()
 
   // TODO: generalize this iteratorConsumed to other iterators
   protected var iteratorConsumed = false
-
   protected var bbHasNext = true
 
-  //protected var firstSpectrumSlices: Array[SpectrumSlice] = _
-  //protected var spectrumSliceBuffer: ArrayBuffer[Array[SpectrumSlice]] = new ArrayBuffer[Array[SpectrumSlice]]
+  private val spectrumBuilderBuffer: ArrayBuffer[SpectrumBuilder] = new ArrayBuffer[SpectrumBuilder]
+  //private var spectrumBuildersCache: ArrayBuffer[SpectrumBuilder] = new ArrayBuffer[SpectrumBuilder]
 
-  private var spectrumBuilderBuffer: ArrayBuffer[SpectrumBuilder] = new ArrayBuffer[SpectrumBuilder]
-  private var spectrumBuildersCache: ArrayBuffer[SpectrumBuilder] = new ArrayBuffer[SpectrumBuilder]
-
-  private var spectrumBuffer: ArrayBuffer[Spectrum] = new ArrayBuffer[Spectrum] // used if usePriorityQueue is false
+  private val spectrumBuffer: ArrayBuffer[Spectrum] = new ArrayBuffer[Spectrum] // used if usePriorityQueue is false
   private var spectrumBufferReadIdx = 0
 
   private var usePriorityQueue = false
@@ -105,7 +100,7 @@ class SpectrumIterator protected (
       spectrumBuilderBuffer += new SpectrumBuilder(spectrumHeader, sdb)
       i += 1
     }
-    this.firstBBReader.readAllSpectrumSlices(this.spectrumBuilderBuffer)
+    this.firstBBReader.readAllSpectrumSlicesData(this.spectrumBuilderBuffer)
 
     this.spectrumBufferReadIdx = 0
     var sameSpectrum = true
@@ -121,7 +116,7 @@ class SpectrumIterator protected (
       val nextBBFirstSpectrumId = nextBBReader.firstSpectrumId
 
       if (nextBBFirstSpectrumId == curBBFirstSpectrumId) {
-        nextBBReader.readAllSpectrumSlices(this.spectrumBuilderBuffer)
+        nextBBReader.readAllSpectrumSlicesData(this.spectrumBuilderBuffer)
       }
       else {
         sameSpectrum = false
@@ -133,7 +128,7 @@ class SpectrumIterator protected (
           val nextSH = spectrumHeaderById(nextBBFirstSpectrumId)
           val nextMsLevel = nextSH.getMsLevel
           // Check if we need to continue loading the spectrum slices
-          if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1)
+          if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1 || nextSH.id < curSH.id)
             continueSlicesLoading = true
         }
       }
@@ -141,14 +136,14 @@ class SpectrumIterator protected (
 
     if (!usePriorityQueue) {
       spectrumBuffer.clear()
-      spectrumBuffer = spectrumBuilderBuffer.map { sb =>
-        sb.result()
+      spectrumBuilderBuffer.foreach { sb =>
+        spectrumBuffer += sb.result()
       }
     } else {
       // Put the loaded spectra in the priority queue
       spectrumBuilderBuffer.foreach { sb =>
         priorityQueue.add(sb.result())
-        spectrumBuildersCache += sb
+        //spectrumBuildersCache += sb
       }
 
       if (continueSlicesLoading) this.initSpectrumSliceBuffer()
@@ -177,7 +172,7 @@ class SpectrumIterator protected (
 
     // If no more spectrum in the buffer
     if (noMoreSpectrumInBuffer) {
-      if (usePriorityQueue) {
+      /*if (usePriorityQueue) {
         // clean spectrum builders cache but keep the laste entry
         val lastSpectrumBuilder = spectrumBuildersCache.last
         spectrumBuildersCache.clear()
@@ -185,7 +180,7 @@ class SpectrumIterator protected (
       } else {
         spectrumBuildersCache.clear()
         spectrumBuildersCache += spectrumBuilderBuffer.last
-      }
+      }*/
 
       if (bbHasNext) {
         initSpectrumSliceBuffer()
@@ -205,7 +200,8 @@ class SpectrumIterator protected (
     spectrum
   }
 
-  def releaseSpectrumData(spectrumId: Long): Unit = {
+  // FIXME: this method call increase memory consumption rather than decreasing it
+  /*def releaseSpectrumData(spectrumId: Long): Unit = {
     val sbPool = if (usePriorityQueue) spectrumBuildersCache else spectrumBuilderBuffer
     val sbOpt = sbPool.find(_.header.id == spectrumId).orElse(spectrumBuildersCache.find(_.header.id == spectrumId))
     //assert(sbOpt.nonEmpty, "unable to retrieve spectrum builder for spectrum id=" + spectrumId)
@@ -220,5 +216,6 @@ class SpectrumIterator protected (
     }
 
     ()
-  }
+  }*/
+
 }

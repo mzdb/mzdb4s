@@ -3,7 +3,7 @@ package com.github.mzdb4s.io.reader.bb2
 import java.nio.ByteBuffer
 
 import com.github.mzdb4s.msdata._
-import com.github.mzdb4s.msdata.builder.ISpectrumDataAdder
+import com.github.mzdb4s.msdata.builder._
 import com.github.mzdb4s.util.primitive.BytesUtils
 import com.github.sqlite4s.ISQLiteBlob
 
@@ -12,6 +12,7 @@ import scala.collection.mutable.LongMap
 class BoundingBoxBlobReader(
   val bbId: Int,
   private var _blob: ISQLiteBlob,
+  val runSliceId: Int,
   val firstSpectrumId: Long,
   val lastSpectrumId: Long,
   val spectrumHeaderById: LongMap[SpectrumHeader],

@@ -29,7 +29,7 @@ abstract class AbstractRunSliceIterator protected(
     val slBuffer = spectrumSliceBuffer.toBuffer
 
     var sameRunSlice = true
-    while ( {bbHasNext = boundingBoxIterator.hasNext(); bbHasNext} && sameRunSlice ) {
+    while ( sameRunSlice && {bbHasNext = boundingBoxIterator.hasNext(); bbHasNext} ) {
       val bb = boundingBoxIterator.next()
       var sameRunSlice = bb.getRunSliceId == this.firstBB.getRunSliceId
       if (sameRunSlice) slBuffer ++= bb.toSpectrumSlices()

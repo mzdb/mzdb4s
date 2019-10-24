@@ -135,14 +135,12 @@ class BoundingBoxIterator protected(override val statement: ISQLiteStatement)(im
     val bbReader = BoundingBoxReader(
       bbId,
       bbBytes,
+      runSliceId,
       firstSpectrumId,
       lastSpectrumId,
       this._spectrumHeaderById,
       this._dataEncodingBySpectrumId
     )
-
-    // TODO: provide me
-    //bb.setRunSliceId(runSliceId)
 
     bbReader
   }

@@ -74,6 +74,8 @@ class SQLiteConnectionWrapper(val conn: SQLiteConnection) extends AnyVal with IS
   @inline def blob(table: String, column: String, rowid: Long, writeAccess: Boolean): ISQLiteBlob = {
     conn.blob("main",table, column, rowid, writeAccess)
   }
+  @inline def getAutoCommit(): Boolean = conn.getAutoCommit
+  @inline def getLastInsertId(): Long = conn.getLastInsertId
   //@inline def getStatementCount(): Int = conn.getChanges // FIXME
 }
 

@@ -23,19 +23,22 @@ object SpectrumHeader {
 case class SpectrumHeader(
   @BeanProperty id: Long,
   @BeanProperty initialId: Int,
+  @BeanProperty title: String,
   @BeanProperty cycle: Int,
   @BeanProperty time: Float,
   @BeanProperty msLevel: Int,
+  @BeanProperty activationType: Option[ActivationType.Value],
   @BeanProperty peaksCount: Int,
   @BeanProperty isHighResolution: Boolean,
   @BeanProperty tic: Float,
   @BeanProperty basePeakMz: Double,
   @BeanProperty basePeakIntensity: Float,
-  @BeanProperty precursorMz: Double,
-  @BeanProperty precursorCharge: Int,
+  @BeanProperty precursorMz: Option[Double],
+  @BeanProperty precursorCharge: Option[Int],
   @BeanProperty bbFirstSpectrumId: Int,
-  @BeanProperty var scanList: ScanList = null,
-  @BeanProperty var precursor: Precursor = null
+  @BeanProperty var scanList: ScanList = null, // TODO: change to Option[ScanList]
+  @BeanProperty var precursor: Precursor = null, // TODO: change to Option[Precursor]
+  @BeanProperty var isolationWindow: Option[IsolationWindow] = None
 ) extends AbstractTableModel[Long](null) with ILcContext {
 
   override def tableName(): String = "spectrum"
@@ -49,7 +52,7 @@ case class SpectrumHeader(
       val paramTree = mzdbCtx.loadParamTreeById(this.tableName(), this.id)
       this.setParamTree(paramTree)
       paramTree
-    } else super.getParamTree()
+    } else super.getParamTree().get
   }
 
   def getOrLoadScanList()(implicit mzdbCtx: MzDbContext): ScanList = {

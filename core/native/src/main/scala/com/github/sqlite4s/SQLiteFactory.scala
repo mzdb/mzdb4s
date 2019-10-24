@@ -36,19 +36,6 @@ object SQLiteFactory extends ISQLiteFactory with SQLiteConnectionFactory with SQ
   }
 }
 
-/*
-object SQLiteFactory extends ISQLiteFactory {
-  // Implicit conversion for proxy objects
-  implicit def nativeConn2wrapper(conn: SQLiteConnection): ISQLiteConnection = new SQLiteConnectionWrapper(conn)
-  implicit def nativeStmt2wrapper(stmt: SQLiteStatement): ISQLiteStatement = new SQLiteStatementWrapper(stmt)
-  implicit def nativeBlob2wrapper(blob: SQLiteBlob): ISQLiteBlob = new SQLiteBlobWrapper(blob)
-
-  // Additional factory methods
-  def newSQLiteConnection(): ISQLiteConnection = new SQLiteConnection()
-  //def newSQLiteConnection(dbfile: File): ISQLiteConnection = new SQLiteConnection(dbfile)
-  def newSQLiteException(errorCode: Int, errorMessage: String): Exception = new SQLiteException(errorCode, errorMessage)
-}*/
-
 class SQLiteConnectionWrapper(val conn: SQLiteConnection) extends AnyVal with ISQLiteConnection {
 
   import SQLiteFactory._
@@ -84,6 +71,8 @@ class SQLiteConnectionWrapper(val conn: SQLiteConnection) extends AnyVal with IS
   @inline def blob(table: String, column: String, rowid: Long, writeAccess: Boolean): ISQLiteBlob = {
     conn.blob(table, column, rowid, writeAccess)
   }
+  @inline def getAutoCommit(): Boolean = conn.getAutoCommit()
+  @inline def getLastInsertId(): Long = conn.getLastInsertId()
   //@inline def getStatementCount(): Int = conn.getChanges // FIXME
 }
 

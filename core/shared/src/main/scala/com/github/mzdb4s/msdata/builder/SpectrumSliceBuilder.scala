@@ -2,34 +2,19 @@ package com.github.mzdb4s.msdata.builder
 
 import com.github.mzdb4s.msdata._
 
-/*class SpectrumSliceBuilder(val header: SpectrumHeader, val initialDataSize: Int) {
+class SpectrumSliceBuilder(
+  val header: SpectrumHeader,
+  val runSliceId: Int,
+  val spectrumDataBuilder: ISpectrumDataBuilder
+) extends AbstractSpectrumBuilder {
 
-  private val spectrumDataBuilder = new SpectrumDataBuilder(initialDataSize)
-
-  def addData(
-    mzList: Array[Double],
-    intensityList: Array[Float],
-    leftHwhmList: Array[Float],
-    rightHwhmList: Array[Float]
-  ): SpectrumSliceBuilder = {
-    spectrumDataBuilder.addData(mzList, intensityList, leftHwhmList, rightHwhmList)
-    this
+  def this(header: SpectrumHeader, runSliceId: Int, initialDataSize: Int)(implicit sdbFactory: SpectrumDataBuilderFactory) {
+    this(header, runSliceId, sdbFactory.acquireBuilder(initialDataSize))
   }
 
-  def addSpectrumData(spectrumData: SpectrumData): SpectrumSliceBuilder = {
-    spectrumDataBuilder.addSpectrumData(spectrumData)
-    this
+  def result(): SpectrumSlice = {
+    val slice = SpectrumSlice(header, spectrumDataBuilder.result())
+    slice.setRunSliceId(runSliceId)
+    slice
   }
-
-  def result(): SpectrumSlice = SpectrumSlice(header, spectrumDataBuilder.result())
-}
-*/
-
-class SpectrumSliceBuilder(val header: SpectrumHeader, val spectrumDataBuilder: ISpectrumDataBuilder) extends AbstractSpectrumBuilder {
-
-  def this(header: SpectrumHeader, initialDataSize: Int) {
-    this(header, new SpectrumDataBuilder(initialDataSize))
-  }
-
-  def result(): SpectrumSlice = SpectrumSlice(header, spectrumDataBuilder.result())
 }

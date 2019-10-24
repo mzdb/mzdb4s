@@ -29,6 +29,7 @@ object MzDbHeader {
   val TABLE_NAME = "mzdb"
 }
 
+// TODO: add fileContent add contacts?
 case class MzDbHeader(
   @BeanProperty var version: String,
   @BeanProperty var creationTimestamp: Int,

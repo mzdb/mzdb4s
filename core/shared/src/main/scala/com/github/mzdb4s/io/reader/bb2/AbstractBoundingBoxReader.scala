@@ -2,6 +2,7 @@ package com.github.mzdb4s.io.reader.bb2
 
 import java.nio.ByteBuffer
 
+import scala.collection.mutable.Buffer
 import scala.collection.mutable.WrappedArray
 
 import com.github.mzdb4s.msdata._
@@ -26,6 +27,11 @@ abstract class AbstractBoundingBoxReader extends IBoundingBoxReader {
 
   override def dispose(): Unit = {
     this.bbIdxFactory.releaseIndex(_bbIndex)
+  }
+
+  override def getPeaksCountAt(idx: Int): Int = {
+    this.checkSpectrumIndexRange(idx)
+    _bbIndex.peaksCounts(idx)
   }
 
   override def getAllSpectraIds(spectraIds: WrappedArray[Long]): Unit = {
@@ -102,10 +108,6 @@ abstract class AbstractBoundingBoxReader extends IBoundingBoxReader {
       }
     }
 
-    /*println("PE="+ pe.toString)
-    println("peaksStartIdx=" + peaksStartIdx)
-    println("bbByteBuffer.array.length=" + bbByteBuffer.array().length)*/
-
     // Set the position of the byte buffer
     bbByteBuffer.position(peaksStartIdx)
 
@@ -139,38 +141,42 @@ abstract class AbstractBoundingBoxReader extends IBoundingBoxReader {
     ()
   }
 
-  @throws[IndexOutOfBoundsException]
-  protected def checkSpectrumIndexRange(idx: Int): Unit = {
-    if (idx < 0 || idx >= this.getSpectraCount)
-      throw new IndexOutOfBoundsException(s"spectrum index out of bounds (idx=$idx), index counting starts at 0")
+  override def readSpectrumSliceAt(idx: Int)(implicit sdbFactory: SpectrumDataBuilderFactory): SpectrumSlice = {
+    val spectrumHeader = spectrumHeaderById(getSpectrumIdAt(idx))
+    val slicePeaksCount = getPeaksCountAt(idx)
+    val sSliceBuilder = new SpectrumSliceBuilder(spectrumHeader, runSliceId, slicePeaksCount)
+    this.readFilteredSpectrumSliceDataAt(idx,-1.0, -1.0, sSliceBuilder)
+    sSliceBuilder.result()
   }
 
-  /*override def readAllSpectrumSlices(runSliceId: Int): Array[SpectrumSlice] = {
-    val spectraCount = this.getSpectraCount()
-    val sl = new Array[SpectrumSlice](spectraCount)
-
-    var i = 0
-    while (i < spectraCount) {
-      val s = this.readSpectrumSliceAt(i)
-      s.setRunSliceId(runSliceId)
-      sl(i) = s
-      i += 1
-    }
-
-    sl
-  }*/
-
-  override def readAllSpectrumSlices(builders: Seq[ISpectrumDataAdder]): Unit = {
+  override def readAllSpectrumSlicesData(builders: Seq[ISpectrumDataAdder]): Unit = {
     val spectraCount = this.getSpectraCount()
     assert(builders.length == spectraCount, "the number of builders must match the number of spectra")
 
     var i = 0
     while (i < spectraCount) {
       this.readSpectrumSliceDataAt(i, builders(i))
-      //s.setRunSliceId(runSliceId)
       i += 1
     }
 
+  }
+
+  override def readAllSpectrumSlices(buffer: Buffer[SpectrumSlice])(implicit sdbFactory: SpectrumDataBuilderFactory): Unit = {
+    val spectraCount = this.getSpectraCount()
+
+    var i = 0
+    while (i < spectraCount) {
+      buffer += this.readSpectrumSliceAt(i)
+      i += 1
+    }
+
+    ()
+  }
+
+  @throws[IndexOutOfBoundsException]
+  protected def checkSpectrumIndexRange(idx: Int): Unit = {
+    if (idx < 0 || idx >= this.getSpectraCount)
+      throw new IndexOutOfBoundsException(s"spectrum index out of bounds (idx=$idx), index counting starts at 0")
   }
 
   // TODO: temp workaround (remove me when each BB is annotated with the number of spectra it contains)
