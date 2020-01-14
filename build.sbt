@@ -36,8 +36,8 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
       // TODO: remove me when SN deps are available for SN 0.4.x
       "tech.sparse" %%% "pine" % "0.1.6",
       "biz.enef" %%% "slogging" % "0.6.1",
-      //"com.lihaoyi" %%% "utest" % "0.6.7" % "test"
-      "com.lihaoyi" %%% "utest" % "0.6.7+8-7c499c15" % "test"
+      "com.lihaoyi" %%% "utest" % "0.6.7" % "test"
+      //"com.lihaoyi" %%% "utest" % "0.6.7+8-7c499c15" % "test"
     ),
     fork := true,
     // TODO: avoid local file copy (see end of buid.sbt) and load directly from .ivy directory
@@ -121,6 +121,7 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
     nativeLinkStubs := true,
     nativeMode := "release-fast", //"debug", //"release-fast", //"release-full",
     nativeLTO := "thin",
+    nativeGC := "immix", //"boehm",
 
     // Link custom native libraries
     nativeLinkingOptions ++= Seq("-L" ++ baseDirectory.value.getAbsolutePath() ++ "/lib"),

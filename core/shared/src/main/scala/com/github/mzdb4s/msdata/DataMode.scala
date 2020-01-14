@@ -5,7 +5,7 @@ object DataMode extends Enumeration {
   val PROFILE: Value = Value(-1,"profile")
 
   /** The centroid. */
-  val CENTROIDED: Value = Value(12,"centroided")
+  val CENTROID: Value = Value(12,"centroid")
 
   /** The fitted. */
   val FITTED: Value = Value(20,"fitted")

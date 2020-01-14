@@ -25,7 +25,7 @@ object MzMLParser {
   // Define some XML tags for index parsing
   private val indexListOffsetStartTag = "<indexListOffset>"
   private val indexListOffsetStartTagLen = indexListOffsetStartTag.length
-  private val offsetRegex = """\s+<offset idRef="(.+)">(\d+)</offset>\s*""".r
+  private val offsetRegex = """\s*<offset idRef="(.+)">(\d+)</offset>\s*""".r
 
   // Define some XML tags for meta-data parsing of <spectrum> sections
   private val scanListEndTag = c"</scanList>"
@@ -63,39 +63,13 @@ class MzMLParser(file: File) extends java.io.Closeable {
     fclose(_opened_file)
   }
 
-  private val mzMLIndex = {
+  private val mzMLIndex: MzMLIndex = {
     val idxOpt = _loadIndex()
     assert(idxOpt.nonEmpty, s"unable to load index from MzML file '$file'")
     idxOpt.get
   }
 
-  /*
-  MzMLMetaData(
-  @BeanProperty dataEncodings: Seq[DataEncoding],
-  @BeanProperty commonInstrumentParamsList: Seq[CommonInstrumentParams],
-  @BeanProperty instrumentConfigurations: Seq[InstrumentConfiguration],
-  @BeanProperty processingMethods: Seq[ProcessingMethod],
-  @BeanProperty runs: Seq[Run],
-  @BeanProperty samples: Seq[Sample],
-  @BeanProperty softwareList: Seq[Software],
-  @BeanProperty sourceFiles: Seq[SourceFile]
-)
-   */
-
   def getMetaData(): MzMLMetaData = {
-
-    /*val dataEncodings = Seq(
-      DataEncoding(
-        id = 1,
-        mode = DataMode.CENTROIDED,
-        peakEncoding = PeakEncoding.HIGH_RES_PEAK
-      ),
-      DataEncoding(
-        id = 2,
-        mode = DataMode.CENTROIDED,
-        peakEncoding = PeakEncoding.LOW_RES_PEAK
-      )
-    )*/
 
     // FIXME: parse this information
     val commonInstrumentParams = CommonInstrumentParams(
@@ -234,9 +208,6 @@ class MzMLParser(file: File) extends java.io.Closeable {
 
         val continue = try {
           if (specChunk != null) {
-            if (specNumber % 100 == 0) {
-              println(s"Processed $specNumber spectra...")
-            }
             //println(s"Processing spectrum '${specChunk.id}'")
             fn(specChunk, specNumber)
           }
@@ -468,7 +439,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
         if (chunk.intensityArrayMetaData.is64Bits) {
           CUtils.doublePtr2DoubleArray(chunk.intensityVector.ptr.asInstanceOf[Ptr[CDouble]], peaksCount).map(_.toFloat)
         } else {
-          CUtils.floatPtr2FloatArray(chunk.mzVector.ptr.asInstanceOf[Ptr[CFloat]], peaksCount)
+          CUtils.floatPtr2FloatArray(chunk.intensityVector.ptr.asInstanceOf[Ptr[CFloat]], peaksCount)
         }
       }
 
@@ -545,29 +516,31 @@ class MzMLParser(file: File) extends java.io.Closeable {
       val buffer = new Array[Byte](bufferLen)
       raf.seek(indexListOffset)
       raf.read(buffer)
+      raf.close()
 
       val lines = new String(buffer).split("\n")
       val linesCount = lines.length
       val spectrumIndexLineIdx = lines.indexWhere(_ contains """<index name="spectrum">""") //<index name="spectrum">
       println(s"spectrumIndexLineIdx: $spectrumIndexLineIdx")
+      println(s"linesCount: $linesCount")
 
       val offsets = new ArrayBuffer[MzMLSpectrumOffset](linesCount)
       var lineIdx = spectrumIndexLineIdx + 1
+
       while (lineIdx < linesCount) {
         val line = lines(lineIdx)
         if (line contains "</index>") {
           lineIdx = linesCount
         }
         else {
-          val spectrumOffset = line match {
-            case MzMLParser.offsetRegex(id, offset) => MzMLSpectrumOffset(id, offset.toLong)
-            case _ => throw new Exception("can't parse offset from line: " + line.take(100))
-          }
-          offsets += spectrumOffset
+
+          offsets += _parseMzMLSpectrumOffset(line)
 
           lineIdx += 1
         }
       }
+
+      println("Read #offset: "+offsets.length)
 
       // FIXME: compute the last spectrum index => use indexOf </spectrum> on the last buffer
       //val spectraIndexes = new Array[MzMLSpectrumIndex](offsets.length)
@@ -611,7 +584,8 @@ class MzMLParser(file: File) extends java.io.Closeable {
         (endOfLastSpectrumIndex - lastOffset.offset).toInt
       )*/
 
-      println("Read #offset: "+offsets.length)
+      println("Read #spectraIndexes: "+spectraIndexes.length)
+
       MzMLIndex(spectraIndexes)
 
     } finally {
@@ -621,8 +595,46 @@ class MzMLParser(file: File) extends java.io.Closeable {
     Some(tmpMzMLIndex)
   }
 
+
+  private def _parseMzMLSpectrumOffset(line: String): MzMLSpectrumOffset = {
+
+    // FIXME: there is a memory leak in SN when use this kind of parsing
+    /*val spectrumOffset1 = line match {
+      case MzMLParser.offsetRegex(id, offset) => MzMLSpectrumOffset(id, offset.toLong)
+      case _ => throw new Exception("can't parse offset from line: " + line.take(100))
+    }*/
+
+    assert(line.contains("</offset>"),"can't parse offset from line: " + line.take(100))
+
+    val idBuffer = new ArrayBuffer[Char](line.length)
+    val offsetBuffer = new ArrayBuffer[Char](line.length)
+
+    var inId = false
+    var inOffset = false
+    line.toCharArray.foreach { char =>
+      if (char == '"') inId = !inId
+      else if (offsetBuffer.isEmpty && char == '>') inOffset = true
+      else if (inOffset && char == '<') inOffset = false
+      else {
+        if (inId) idBuffer += char
+        else if (inOffset) offsetBuffer += char
+      }
+    }
+
+    val(id,offset) = (new String(idBuffer.toArray),new String(offsetBuffer.toArray))
+    /*println("line: "+ line)
+    println(offsetBuffer.length)
+    println(offset.length)
+    println(s"id='$id', offset='$offset'")*/
+
+    val spectrumOffset2 = MzMLSpectrumOffset(id, offset.toLong)
+    //assert(spectrumOffset1 == spectrumOffset2,s"$spectrumOffset1 != $spectrumOffset2")
+
+    spectrumOffset2
+  }
+
   @throws[NumberFormatException]
-  def _charArrayToLong(data: Array[Char], start: Int, end: Int): Long = {
+  private def _charArrayToLong(data: Array[Char], start: Int, end: Int): Long = {
     var result = 0L
 
     var i = start

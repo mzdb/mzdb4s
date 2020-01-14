@@ -383,7 +383,7 @@ abstract class AbstractMzDbWriter extends Logging {
     val peaksCount = sd.getPeaksCount()
 
     val msLevel = sh.getMsLevel
-    val isolationWindowOpt = sh.isolationWindow
+    val isolationWindowOpt = if (isDIA && msLevel == 2) sh.isolationWindow else None // very important for cache
     val spectrumId = sh.getId
     val spectrumTime = sh.getElutionTime()
     //_spectrumIdByTime(spectrumTime) = spectrumId
@@ -424,7 +424,6 @@ abstract class AbstractMzDbWriter extends Logging {
     while (i < peaksCount) {
       val mz = sd.getMzAt(i)
 
-      /*
       if (i == 0) {
         curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
         bbFirstSpectrumId = curBB.spectrumIds.head
@@ -438,10 +437,11 @@ abstract class AbstractMzDbWriter extends Logging {
         }
       }
 
-      // Add data point to the Bounding Box
-      val lastSpectrumSlice = curBB.spectrumSlices.last.get
-      lastSpectrumSlice.lastPeakIdx = i
-      */
+      if (curBB.spectrumSlices.last.isDefined) {
+        // Add data point to the Bounding Box
+        val lastSpectrumSlice = curBB.spectrumSlices.last.get
+        lastSpectrumSlice.lastPeakIdx = i
+      }
 
       i += 1
     }
@@ -524,7 +524,7 @@ abstract class AbstractMzDbWriter extends Logging {
 
     bb.spectrumIds += spectrumId
     //bb.spectrumSlices += Some(_bbCache.acquireSpectrumDataBuilder(sh, sh.peaksCount))
-    bb.spectrumSlices += Some(SpectrumSliceIndex(spectrum,peakIdx,peakIdx))
+    bb.spectrumSlices += Some(SpectrumSliceIndex(spectrum.data,peakIdx,peakIdx))
 
     bb
   }
@@ -532,22 +532,25 @@ abstract class AbstractMzDbWriter extends Logging {
   private def _flushBBRow(msLevel: Int, isolationWindowOpt: Option[IsolationWindow]): Unit = {
 
     // Retrieve the longest list of spectra ids
-    val lcCtxBySpecId = new LongMap[ILcContext]()
+    //val lcCtxBySpecId = new LongMap[ILcContext]()
+    val spectraIds = new ArrayBuffer[Long]()
     _bbCache.forEachCachedBB(msLevel, isolationWindowOpt) { bb =>
-      bb.spectrumSlices.foreach { sSliceOpt =>
+      spectraIds ++= bb.spectrumIds
+      /*bb.spectrumIds.zip(bb.spectrumSlices).foreach { case (id,sSliceOpt) =>
         val sSlice = sSliceOpt.get
-        lcCtxBySpecId(sSlice.spectrum.header.getSpectrumId()) = sSlice.spectrum.header
-      }
+        lcCtxBySpecId(id) = sSlice.spectrum.header
+      }*/
     }
 
-    val distinctBBRowSpectraIds = lcCtxBySpecId.keys.toArray.sorted
+    //val distinctBBRowSpectraIds = lcCtxBySpecId.keys.toArray.sorted
+    val distinctBBRowSpectraIds = spectraIds.distinct.sorted
     //println(distinctBBRowSpectraIds.toList)
 
     // Insert all BBs corresponding to the same MS level and the same isolation window (DIA only)
     _bbCache.forEachCachedBB(msLevel, isolationWindowOpt) { bb =>
 
       // Map slices by spectrum id
-      val specSliceById = bb.spectrumSlices.toLongMapWith(ssOpt => ssOpt.get.spectrum.header.getSpectrumId -> ssOpt.get)
+      val specSliceById = bb.spectrumIds.zip(bb.spectrumSlices).withFilter(_._2.isDefined).map( kv=> (kv._1,kv._2.get) ).toLongMap //With(ssOpt => ssOpt.get.spectrum.header.getSpectrumId -> ssOpt.get)
 
       // Create missing slices
       val spectraSlices = distinctBBRowSpectraIds.map { specId =>
@@ -563,7 +566,7 @@ abstract class AbstractMzDbWriter extends Logging {
       bb.spectrumSlices ++= spectraSlices
 
       // Insert Bounding Box
-      //this._insertAndIndexBoundingBox(bb)
+      this._insertAndIndexBoundingBox(bb)
     }
 
     // Remove BB row
@@ -596,7 +599,7 @@ abstract class AbstractMzDbWriter extends Logging {
     } else if (msLevel == 2 && isDIA) {
 
       // TODO: parse this in the MzMLParser?
-      try {
+      try { // TODO: remove this try/catch
         /*val precursorListStr = smd.precursorList.get
         val selectedIons = precursorListStr.split("selectedIon>")
         if (selectedIons.length <= 1) false
@@ -655,7 +658,7 @@ abstract class AbstractMzDbWriter extends Logging {
 }
 
 /*
-case class SpectrumDataBuilder(
+case class SpectrumDataBuilder( // actually used to ceate a spectrum slice
 
   /** The LC context. */
   var lcContext: ILcContext,
@@ -767,7 +770,7 @@ case class SpectrumDataBuilder(
 }*/
 
 private[this] case class SpectrumSliceIndex(
-  spectrum: Spectrum,
+  spectrumData: ISpectrumData,
   var firstPeakIdx: Int,
   var lastPeakIdx: Int
 ) {
@@ -795,7 +798,8 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
   private var bbId = 0
 
   private val boundingBoxMap = new HashMap[(Int,Option[IsolationWindow]), BoundingBox]
-  private val reusableBBs = new HashSet[BoundingBox]
+  // val boundingBoxMap = new collection.mutable.ListBuffer[((Int,Option[IsolationWindow]), BoundingBox)]
+  //private val reusableBBs = new HashSet[BoundingBox] // TODO: remove this, not useful
 
   /*
   private val reusableSpecBuilders = new HashSet[SpectrumDataBuilder]
@@ -871,7 +875,10 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
 
     runSlicesToRemove.foreach { runSliceId =>*/
       val removedBBOpt = boundingBoxMap.remove(runSliceId, isolationWindow)
+      //val removedBBOpt = boundingBoxMap.find( _._1 == (runSliceId, isolationWindow) )
+
       if (removedBBOpt.isDefined) {
+        //boundingBoxMap -= removedBBOpt.get
 
         /*
         for (sbOpt <- removedBBOpt.get.spectrumSlices; sb <- sbOpt) {
@@ -880,10 +887,12 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
         }
         */
 
-        val bb = removedBBOpt.get
+        /*
+        val bb = removedBBOpt.get._2
         bb.spectrumIds.clear()
         bb.spectrumSlices.clear()
-        reusableBBs += bb
+        reusableBBs += bb // TODO: remove this reusableBBs feature
+        */
       }
     }
   }
@@ -904,7 +913,7 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
     isolationWindow: Option[IsolationWindow] // defined only for DIA data
   ): Option[BoundingBox] = {
     val bbKey = (runSliceId,isolationWindow)
-    boundingBoxMap.get(bbKey)
+    boundingBoxMap.find(_._1 == bbKey).map(_._2)
   }
 
   def createBoundingBox(
@@ -918,7 +927,7 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
     val bbKey = (runSliceId,isolationWindow)
     assert(! boundingBoxMap.contains(bbKey), "cannot create a new bounding box since cache has not been flushed")
 
-    val newOrCachedBB = if (reusableBBs.isEmpty) {
+    /*val newOrCachedBB = if (reusableBBs.isEmpty) {
       val newBB = BoundingBox()
       newBB.spectrumIds = new ArrayBuffer[Long](slicesCountHint)
       newBB.spectrumSlices = new ArrayBuffer[Option[SpectrumSliceIndex]](slicesCountHint)
@@ -927,60 +936,27 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
       val bb = reusableBBs.head
       reusableBBs -= bb
       bb
-    }
+    }*/
 
-    newOrCachedBB.id = { bbId += 1; bbId }
-    newOrCachedBB.firstTime = spectrumTime
-    newOrCachedBB.lastTime = spectrumTime
-    newOrCachedBB.runSliceId = runSliceId
-    newOrCachedBB.msLevel = msLevel
-    newOrCachedBB.dataEncoding = dataEncoding
-    newOrCachedBB.isolationWindow = isolationWindow
+    val newOrCachedBB = BoundingBox(
+      spectrumIds = new ArrayBuffer[Long](slicesCountHint),
+      spectrumSlices = new ArrayBuffer[Option[SpectrumSliceIndex]](slicesCountHint),
+      id = { bbId += 1; bbId },
+      firstTime = spectrumTime,
+      lastTime = spectrumTime,
+      runSliceId = runSliceId,
+      msLevel = msLevel,
+      dataEncoding = dataEncoding,
+      isolationWindow = isolationWindow
+    )
 
+    //boundingBoxMap ++= List( (bbKey, newOrCachedBB) )
     boundingBoxMap(bbKey) = newOrCachedBB
+    //println(boundingBoxMap.size)
 
     newOrCachedBB
   }
 
-  /*def createOrReplaceCurrentBoundingBox(
-    spectrumTime: Float,
-    runSliceId: Int,
-    msLevel: Int,
-    dataEncoding: DataEncoding,
-    isolationWindow: Option[IsolationWindow] // defined only for DIA data
-  ): (Option[BoundingBox],Option[BoundingBox]) = {
-    val bbKey = (runSliceId,isolationWindow)
-    val curBBOpt = boundingBoxMap.get(bbKey)
-    //var newBBOpt = Option.empty[BoundingBox]
-
-    var needNewBB = if (curBBOpt.isEmpty) true
-    else {
-      val maxRtWidth = if (msLevel == 1) bbSizes.BB_RT_WIDTH_MS1 else bbSizes.BB_RT_WIDTH_MSn
-      if (spectrumTime - curBBOpt.get.firstTime > maxRtWidth) true else false
-    }
-
-    if (!needNewBB) {
-      curBBOpt.get.lastTime = spectrumTime // update BB last RT
-      (curBBOpt, None)
-    }
-    else {
-      val newBB = BoundingBox(
-        id = { bbId += 1; bbId },
-        firstTime = spectrumTime,
-        lastTime = spectrumTime,
-        runSliceId = runSliceId,
-        msLevel = msLevel,
-        dataEncoding = dataEncoding,
-        isolationWindow = isolationWindow,
-        spectrumIds = new ArrayBuffer[Long],
-        spectrumSlices = new ArrayBuffer[ISpectrumData]
-      )
-      boundingBoxMap(bbKey) = newBB
-      //allBBs += newBB
-
-      (curBBOpt,Some(newBB))
-    }
-  }*/
 
 }
 

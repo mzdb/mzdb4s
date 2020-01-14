@@ -22,7 +22,7 @@ object AbstractDataEncodingReader {
     val byteOrderAsStr = record.columnString(DataEncodingTable.BYTE_ORDER)
 
     // Parse record values
-    val dm = if (dmAsStr == "centroided") DataMode.CENTROIDED else DataMode.withName(dmAsStr) // "centroided" was used in old mzDB files
+    val dm = if (dmAsStr == "centroided") DataMode.CENTROID else DataMode.withName(dmAsStr) // "centroided" was used in old mzDB files
     val bo = if (byteOrderAsStr.equalsIgnoreCase("big_endian")) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN
 
     val (mzPrecision, intPrecision) = mzIntPrecisions

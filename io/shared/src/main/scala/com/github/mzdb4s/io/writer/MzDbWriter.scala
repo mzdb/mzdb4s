@@ -59,14 +59,14 @@ class MzDbWriter(
       else {
         val spectrumSliceIdx = spectrumSliceOpt.get
 
-        val spectrumData = spectrumSliceIdx.spectrum.data
+        val spectrumData = spectrumSliceIdx.spectrumData
         val firstPeakIdx = spectrumSliceIdx.firstPeakIdx
         val lastPeakIdx = spectrumSliceIdx.lastPeakIdx
 
         val slicePeaksCount = spectrumSliceIdx.peaksCount()
         bytesBuffer.putInt(slicePeaksCount)
 
-        var i = spectrumSliceIdx.firstPeakIdx
+        var i = firstPeakIdx
         while (i <= lastPeakIdx) {
 
           if (pe == PeakEncoding.HIGH_RES_PEAK) {
