@@ -65,11 +65,10 @@ abstract class AbstractBlobReader /*protected(
     minMz: Double,
     maxMz: Double
   ): SpectrumData = {
-    //import com.github.mzdb4s.msdata.PeakEncoding
 
     val dataMode = de.getMode
     val pe = de.getPeakEncoding
-    val structSize = de.getPeakStructSize
+    val structSize = de.getPeakStructSize()
 
     var peaksCount = 0
     var peaksStartIdx = 0
@@ -80,7 +79,8 @@ abstract class AbstractBlobReader /*protected(
       peaksStartIdx = spectrumSliceStartPos
       // Else determine the peaksStartIdx and peaksCount corresponding to provided m/z filters
     }
-    else { // Determine the max m/z threshold to use
+    else {
+      // Determine the max m/z threshold to use
       var maxMzThreshold = maxMz
       if (maxMz < 0) maxMzThreshold = Double.MaxValue
 

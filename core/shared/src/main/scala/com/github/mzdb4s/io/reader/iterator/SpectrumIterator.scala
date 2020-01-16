@@ -15,7 +15,8 @@ object SpectrumIterator {
   //private val allMsLevelsSqlQuery = "SELECT bounding_box.* FROM bounding_box, spectrum WHERE spectrum.id = bounding_box.first_spectrum_id"
   //private val singleMsLevelSqlQuery = allMsLevelsSqlQuery + " AND spectrum.ms_level= ?"
   // FIXME: find the most appropriate query
-  private val allMsLevelsSqlQuery = "SELECT * FROM bounding_box"
+  // FIXME: try to iterate the spectra without having to sort the bounding boxes => performance penalty
+  private val allMsLevelsSqlQuery = "SELECT * FROM bounding_box ORDER BY first_spectrum_id"
   private val singleMsLevelSqlQuery = "SELECT bounding_box.* FROM bounding_box, spectrum WHERE spectrum.id = bounding_box.first_spectrum_id AND spectrum.ms_level= ?"
   private val PRIORITY_QUEUE_INITIAL_CAPACITY = 200
 }
@@ -78,6 +79,7 @@ class SpectrumIterator protected (
     this.initSpectrumSliceBuffer()
   }
 
+  // Called for one/many row(s) of bounding boxes (depending on the number of MS levels)
   protected def initSpectrumSliceBuffer(): Unit = {
     spectrumSliceBuffer.clear()
 
@@ -86,55 +88,101 @@ class SpectrumIterator protected (
     else
       this.spectrumSliceBuffer += this.firstBB.toSpectrumSlices()
 
-    this.spectrumIdx = 0
+    if (!usePriorityQueue) {
+      this.spectrumBuffer.clear()
+      // Reset index for the spectrum buffer to be built from the slice buffer
+      this.spectrumIdx = 0
+    }
 
-    var sameSpectrum = true
-    var continueSlicesLoading = false
-
-    val curSH = spectrumSliceBuffer.head.head.getHeader
+    var continueSlicesLoading = true
+    var flushed = false
+    var curSH = spectrumSliceBuffer.head.head.getHeader
+    val bbRowLastSpectrumId = this.firstBB.lastSpectrumId
 
     // Build spectrum slice buffer
-    while ( sameSpectrum && {bbHasNext = boundingBoxIterator.hasNext(); bbHasNext}) {
+    while (continueSlicesLoading && {bbHasNext = boundingBoxIterator.hasNext(); bbHasNext}) {
       val bb = boundingBoxIterator.next()
       val sSlices = bb.toSpectrumSlices()
+      //println(bb.firstSpectrumId)
 
       if (sSlices != null) { // FIXME: it should not happen with current spec => make an assertion?
         val nextSH = sSlices.head.getHeader
 
         if (nextSH.getSpectrumId == curSH.getSpectrumId) {
           spectrumSliceBuffer += sSlices
+          flushed = false
         }
         else {
-          sameSpectrum = false
+
+          // Convert current buffer in spectra
+          this._flushSpectrumSliceBuffer()
+          flushed = true
 
           // Keep this bounding box for next iteration
           this.firstBB = bb
           this.firstSpectrumSlices = sSlices
 
+          var continue = false
           if (usePriorityQueue) { // Put the loaded spectra in the priority queue
+
+            // Check if the next spectrum has an ID greater than the last spectrum of the BB row
+            continue = if (nextSH.getMsLevel == 1 && nextSH.getSpectrumId() > bbRowLastSpectrumId) false else true
+
+            /*
             val nextMsLevel = nextSH.getMsLevel
             // Check if we need to continue loading the spectrum slices
-            if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1 || nextSH.id < curSH.id)
-              continueSlicesLoading = true
+            //println( (curSH.getCycle, nextSH.getCycle), (curSH.getMsLevel, nextMsLevel), (nextSH.id,curSH.id))
+
+            if (nextMsLevel == 1 && nextMsLevel <= curSH.getMsLevel && curSH.getCycle != nextSH.getCycle) {
+              continue = false
+            }*/
+
+            /*if (curSH.getCycle == nextSH.getCycle || curSH.getMsLevel == nextMsLevel || nextMsLevel > 1 || nextSH.id < curSH.id) {
+              //println("continue current spectrum ID=" + curSH.id)
+              continue = true
+              if (nextSH.getMsLevel == 1) {
+                curSH = nextSH
+              }
+            } else {
+              println("stopping loop")
+            }*/
+          }
+          continueSlicesLoading = continue
+
+          if (continueSlicesLoading) {
+            curSH = nextSH
+            this.spectrumSliceBuffer += this.firstSpectrumSlices
           }
         }
       }
     }
 
-    if (!usePriorityQueue) {
-      spectrumBuffer.clear()
-      // TODO: optimize transposition
-      spectrumBuffer = spectrumSliceBuffer.transpose.map(_spectrumSlicesToSpectrum)
-    } else {
+    //println("loop stopped")
+
+    if (!flushed) {
+      //println("not flushed")
+      this._flushSpectrumSliceBuffer()
+    }
+
+    ()
+  }
+
+  private def _flushSpectrumSliceBuffer(): Unit = {
+    if (usePriorityQueue) {
       // Put the loaded spectra in the priority queue
       // TODO: optimize transposition
       spectrumSliceBuffer.transpose.foreach { spectrumSlices =>
         priorityQueue.add(_spectrumSlicesToSpectrum(spectrumSlices))
       }
 
-      if (continueSlicesLoading) this.initSpectrumSliceBuffer()
-    }
+      spectrumSliceBuffer.clear()
 
+    } else {
+      // TODO: optimize transposition
+      spectrumBuffer = spectrumSliceBuffer.transpose.map(_spectrumSlicesToSpectrum)
+
+      spectrumSliceBuffer.clear()
+    }
   }
 
   private def _spectrumSlicesToSpectrum(spectrumSlices: ArrayBuffer[SpectrumSlice]): Spectrum = {
@@ -144,7 +192,11 @@ class SpectrumIterator protected (
       peaksCount += ssData.peaksCount
       ssData
     }
-    Spectrum(spectrumSlices.head.header,SpectrumDataBuilder.mergeSpectrumDataList(spectrumDataList, peaksCount))
+    //println("spectrumSlices.head.header.id = " + spectrumSlices.head.header.id)
+    Spectrum(
+      spectrumSlices.head.header,
+      SpectrumDataBuilder.mergeSpectrumDataList(spectrumDataList, peaksCount)
+    )
   }
 
   override def next(): Spectrum = { // firstSpectrumSlices is not null

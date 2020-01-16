@@ -377,6 +377,8 @@ abstract class AbstractMzDbWriter extends Logging {
 
   def insertSpectrum(spectrum: Spectrum, metaDataAsText: SpectrumXmlMetaData, dataEncoding: DataEncoding): Unit = { // --- INSERT SPECTRUM DATA --- //
 
+    _insertedSpectraCount += 1
+
     val sh = spectrum.getHeader
     val sd = spectrum.getData
     val smd = metaDataAsText
@@ -384,7 +386,8 @@ abstract class AbstractMzDbWriter extends Logging {
 
     val msLevel = sh.getMsLevel
     val isolationWindowOpt = if (isDIA && msLevel == 2) sh.isolationWindow else None // very important for cache
-    val spectrumId = sh.getId
+    //val spectrumId = sh.getId
+    val spectrumId = _insertedSpectraCount // note: we maintain our own spectrum ID counter
     val spectrumTime = sh.getElutionTime()
     //_spectrumIdByTime(spectrumTime) = spectrumId
     //println("spectrumId is " + spectrumId)
@@ -392,7 +395,8 @@ abstract class AbstractMzDbWriter extends Logging {
     val dataEnc = this._dataEncodingRegistry.getOrAddDataEncoding(dataEncoding)
 
     // FIXME: min m/z should be retrieve from meta-data (scan list)
-    var curMinMz = math.round(sd.getMzAt(0)).toFloat
+    var curMinMz = math.round(sd.getMzAt(0) / bbSizes.BB_MZ_HEIGHT_MS1).toInt * bbSizes.BB_MZ_HEIGHT_MS1.toFloat
+
     //println(s"msLevel is $msLevel; min m/z is: $curMinMz")
 
     val mzInc = (if (msLevel == 1) bbSizes.BB_MZ_HEIGHT_MS1 else bbSizes.BB_MZ_HEIGHT_MSn).toFloat
@@ -433,8 +437,14 @@ abstract class AbstractMzDbWriter extends Logging {
         while (mz > curMaxMz) {
           curMinMz += mzInc
           curMaxMz += mzInc
-          curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
+
+          // Very important: ensure run slices are created in increasing m/z order
+          val runSliceBoundaries = (msLevel, curMinMz, curMaxMz)
+          if (!_runSliceStructureFactory.hasRunSlice(runSliceBoundaries))
+            _runSliceStructureFactory.addRunSlice(runSliceBoundaries)
         }
+
+        curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
       }
 
       if (curBB.spectrumSlices.last.isDefined) {
@@ -490,8 +500,6 @@ abstract class AbstractMzDbWriter extends Logging {
 
     stmt.step()
     stmt.reset()
-
-    _insertedSpectraCount += 1
 
     ()
   } // ends insertSpectrum
@@ -856,6 +864,7 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
 
   def forEachCachedBB(msLevel: Int, isolationWindow: Option[IsolationWindow])(boundingBoxFn: BoundingBox => Unit): Unit = {
     for (
+      // FIXME: sorting by runSliceId is not sage => nothing ensures that run slice IDs are created in the right order
       ((runSliceId,isoWinOpt),bb) <- boundingBoxMap.toList.sortBy(_._2.runSliceId);
       if bb.msLevel == msLevel && isoWinOpt == isolationWindow
     ) {
@@ -867,6 +876,7 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
 
     //val runSlicesToRemove = new ArrayBuffer[Int]()
     for (
+      // TODO: do we need to sort?
       ((runSliceId,isoWinOpt),bb) <- boundingBoxMap.toList.sortBy(_._2.runSliceId);
       if bb.msLevel == msLevel && isoWinOpt == isolationWindow
     ) {

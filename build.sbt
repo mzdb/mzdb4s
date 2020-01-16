@@ -79,7 +79,10 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
     ),
     fork := true,
     // TODO: avoid local file copy (see end of buid.sbt) and load directly from .ivy directory
-    javaOptions := Seq("-Dsqlite4java.library.path=" + file(".").absolutePath)
+    javaOptions := Seq(
+      "-Dsqlite4java.library.path=" + file(".").absolutePath,
+      "-Xmx4G"
+    )
   )
   // configure Scala-Native settings
   .nativeSettings( // defined in sbt-scala-native
