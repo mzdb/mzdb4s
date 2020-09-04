@@ -89,7 +89,7 @@ class MzDbWriter(
       sliceIdx += 1
     }
 
-    var stmt = this.bboxInsertStmt //.asInstanceOf[SQLiteStatementWrapper].stmt
+    val stmt = this.bboxInsertStmt //.asInstanceOf[SQLiteStatementWrapper].stmt
     stmt.bind(1, bbBytes)
     stmt.bind(2, bb.runSliceId)
     stmt.bind(3, spectrumIds.head) // first_spectrum_id

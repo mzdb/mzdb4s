@@ -55,32 +55,43 @@ class ParamTree() extends AbstractParamTree
 //@XmlRootElement(name = "precursor")
 class Precursor {
   //@XmlAttribute(required = true)
-  protected var spectrumRef: String = null
+  protected var spectrumRef: String = _
   //@XmlElement(name = "isolationWindow")
-  protected var isolationWindow: IsolationWindowParamTree = null
+  protected var isolationWindow: IsolationWindowParamTree = _
   //@XmlElement(name = "selectedIonList")
-  protected var selectedIonList: SelectedIonList = null
+  protected var selectedIonList: SelectedIonList = _
   //@XmlElement(name = "activation")
-  protected var activation: Activation = null
+  protected var activation: Activation = _
 
   def getSpectrumRef(): String = spectrumRef
+  def setSpectrumRef(spectrumRef: String): Unit = {
+    this.spectrumRef = spectrumRef
+  }
 
   def getIsolationWindow(): IsolationWindowParamTree = isolationWindow
+  def setIsolationWindow(isolationWindow: IsolationWindowParamTree): Unit = {
+    this.isolationWindow = isolationWindow
+  }
 
   def getActivation(): Activation = activation
+  def setActivation(activation: Activation): Unit = {
+    this.activation = activation
+  }
 
   def getSelectedIonList(): SelectedIonList = selectedIonList
+  def setSelectedIonList(selectedIonList: SelectedIonList): Unit = {
+    this.selectedIonList = selectedIonList
+  }
 
   def parseFirstSelectedIonMz(): Double = {
-    val sil = this.getSelectedIonList()
-    val si = sil.getSelectedIons().head
-    val precMzAsStr = si.getCVParam(PsiMsCV.SELECTED_ION_MZ).getValue
+    val ion = this.getSelectedIonList().getSelectedIons().head
+    val precMzAsStr = ion.getCVParam(PsiMsCV.SELECTED_ION_MZ).getValue
     precMzAsStr.toDouble
   }
 }
 
 //@XmlRootElement(name = "scanList")
-class ScanList() extends AbstractParamTree {
+class ScanList private() extends AbstractParamTree {
   //@XmlAttribute(required = true)
   //@XmlSchemaType(name = "nonNegativeInteger")
   protected var count = 0
@@ -93,13 +104,19 @@ class ScanList() extends AbstractParamTree {
   }
 
   def getScans(): Seq[ScanParamTree] = scans
+  def setScans(scans: Seq[ScanParamTree]): Unit = {
+    this.scans = scans
+  }
 }
 
-class ScanParamTree() extends AbstractParamTree {
+class ScanParamTree(instrumentConfigurationRef: String) extends AbstractParamTree {
   //@XmlElementWrapper
-  protected var scanWindowList: Seq[ScanWindowList] = _
+  protected var scanWindowList: ScanWindowList = _
 
-  def getScanWindowList(): Seq[ScanWindowList] = scanWindowList
+  def getScanWindowList(): ScanWindowList = scanWindowList
+  def setScanWindowList(scanWindowList: ScanWindowList): Unit = {
+    this.scanWindowList = scanWindowList
+  }
 
   def getThermoMetaData(): ThermoScanMetaData = {
     val filterStringCvParam = this.getCVParam(PsiMsCV.FILTER_STRING)
@@ -112,7 +129,7 @@ class ScanParamTree() extends AbstractParamTree {
 class ScanWindow extends AbstractParamTree
 
 //@XmlRootElement(name = "scanWindowList")
-class ScanWindowList() extends AbstractParamTree {
+class ScanWindowList private() extends AbstractParamTree {
   //@XmlAttribute(required = true)
   //@XmlSchemaType(name = "nonNegativeInteger")
   protected var count = 0
@@ -123,11 +140,15 @@ class ScanWindowList() extends AbstractParamTree {
     this()
     this.count = c
   }
+
+  def setScanWindows(scanWindows: Seq[ScanWindow]): Unit = {
+    this.scanWindows = scanWindows
+  }
 }
 
 class SelectedIon() extends AbstractParamTree
 
-class SelectedIonList() extends AbstractParamTree {
+class SelectedIonList private() extends AbstractParamTree {
   //@XmlAttribute(required = true)
   //@XmlSchemaType(name = "nonNegativeInteger")
   protected var count = 0

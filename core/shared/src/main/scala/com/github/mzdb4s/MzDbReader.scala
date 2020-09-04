@@ -35,7 +35,7 @@ class MzDbReader(
   // Disable logs for JVM implementation
   // TODO: do the same for Native implementation
   if (!logConnections) {
-    sf.configureLogging(LogLevel.OFF)
+    sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
   }
 
   // Check if database exists

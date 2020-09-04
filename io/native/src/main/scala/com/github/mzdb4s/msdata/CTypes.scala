@@ -51,13 +51,13 @@ object CByteOrder extends CUIntEnum {
 
 object CDataMode extends CIntEnum {
   final val PROFILE: Value = -1
-  final val CENTROIDED: Value = 12
+  final val CENTROID: Value = 12
   final val FITTED: Value = 20
 
   def withName(valueName: String): Value = {
     valueName match {
       case "profile" => PROFILE
-      case "centroided" => CENTROIDED
+      case "centroid" => CENTROID
       case "fitted" => FITTED
     }
   }
@@ -65,7 +65,7 @@ object CDataMode extends CIntEnum {
   def stringOf(value: Value): String = {
     value match {
       case PROFILE => "profile"
-      case CENTROIDED => "centroided"
+      case CENTROID => "centroid"
       case FITTED => "fitted"
     }
   }

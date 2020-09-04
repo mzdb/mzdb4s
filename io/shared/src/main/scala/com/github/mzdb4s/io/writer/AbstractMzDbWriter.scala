@@ -66,11 +66,13 @@ abstract class AbstractMzDbWriter extends Logging {
     this._connection.open(allowCreate = true) // allow create => true
 
     // SQLite optimization
+    // See: https://blog.devart.com/increasing-sqlite-performance.html
     this._connection.exec("PRAGMA encoding='UTF-8';")
     this._connection.exec("PRAGMA synchronous=OFF;")
     this._connection.exec("PRAGMA journal_mode=OFF;")
     this._connection.exec("PRAGMA temp_store=2;")
     this._connection.exec("PRAGMA cache_size=-100000;") // around 100 Mo
+    this._connection.exec("PRAGMA page_size=4096;") // see: https://www.sqlite.org/pgszchng2016.html
 
     this._connection.exec("PRAGMA automatic_index=OFF;")
     this._connection.exec("PRAGMA locking_mode=EXCLUSIVE;") // we want to lock file access for the whole creation process
@@ -84,7 +86,7 @@ abstract class AbstractMzDbWriter extends Logging {
     // BEGIN TRANSACTION
     this._connection.exec("BEGIN TRANSACTION;")
 
-    println("auto commit:" + this._connection.getAutoCommit())
+    //println("auto commit:" + this._connection.getAutoCommit())
 
     // Init DDL schema
     this._connection.exec(MzDbSchema.getDDLString())
@@ -189,7 +191,7 @@ abstract class AbstractMzDbWriter extends Logging {
       // DBO: I don't why but it doesn't work inside the previous connection
       this._connection = sf.newSQLiteConnection(dbLocation)
       this._connection.open(allowCreate = false)
-      _connection.exec(s"INSERT INTO sqlite_sequence VALUES ('spectrum',${_insertedSpectraCount});")
+      this._connection.exec(s"INSERT INTO sqlite_sequence VALUES ('spectrum',${_insertedSpectraCount});")
       this._connection.dispose()
     }
   }
@@ -317,8 +319,8 @@ abstract class AbstractMzDbWriter extends Logging {
       //stmt.bind(2, java.sql.TimestampUtils.getISO8601StringForDate(run.getStartTimestamp))
       stmt.bind(2, "2015-02-05T19:30:47Z")
 
-      if (run.getParamTree.isEmpty) stmt.bind(3, "<params />")
-      else stmt.bind(3, _xmlSerializer.serializeParamTree(run.getParamTree.get))
+      if (run.getParamTree().isEmpty) stmt.bind(3, "<params />")
+      else stmt.bind(3, _xmlSerializer.serializeParamTree(run.getParamTree().get))
 
       // FIXME: do not use default values
       stmt.bindNull(4)
@@ -377,12 +379,15 @@ abstract class AbstractMzDbWriter extends Logging {
 
   def insertSpectrum(spectrum: Spectrum, metaDataAsText: SpectrumXmlMetaData, dataEncoding: DataEncoding): Unit = { // --- INSERT SPECTRUM DATA --- //
 
-    _insertedSpectraCount += 1
-
     val sh = spectrum.getHeader
     val sd = spectrum.getData
     val smd = metaDataAsText
     val peaksCount = sd.getPeaksCount()
+
+    // FIXME: deal with empty spectra
+    if (peaksCount == 0) return
+
+    _insertedSpectraCount += 1
 
     val msLevel = sh.getMsLevel
     val isolationWindowOpt = if (isDIA && msLevel == 2) sh.isolationWindow else None // very important for cache
@@ -393,67 +398,73 @@ abstract class AbstractMzDbWriter extends Logging {
     //println("spectrumId is " + spectrumId)
 
     val dataEnc = this._dataEncodingRegistry.getOrAddDataEncoding(dataEncoding)
-
-    // FIXME: min m/z should be retrieve from meta-data (scan list)
-    var curMinMz = math.round(sd.getMzAt(0) / bbSizes.BB_MZ_HEIGHT_MS1).toInt * bbSizes.BB_MZ_HEIGHT_MS1.toFloat
-
-    //println(s"msLevel is $msLevel; min m/z is: $curMinMz")
-
     val mzInc = (if (msLevel == 1) bbSizes.BB_MZ_HEIGHT_MS1 else bbSizes.BB_MZ_HEIGHT_MSn).toFloat
-    var curMaxMz = curMinMz + mzInc
 
-    // FIXME: this is a workaround => find a better way to do this
-    if (msLevel == 2 && !isDIA) {
-      curMinMz = 0
-      curMaxMz = bbSizes.BB_MZ_HEIGHT_MSn.toFloat
-    }
-
-    //println(s"msLevel is $msLevel; retained m/z range: $curMinMz/$curMaxMz")
-
-    val isTimeForNewBBRow = _bbCache.isTimeForNewBBRow(msLevel, isolationWindowOpt, spectrumTime)
-
-    // Flush BB row when we reach a new row (retention time exceeding size of the bounding box for this MS level)
-    if (isTimeForNewBBRow) {
-      //println("******************************************************* FLUSHING BB ROW ****************************************")
-      _flushBBRow(msLevel, isolationWindowOpt)
-    }
-
-    // TODO: put _getBBWithNextSpectrumSlice back here when memory issues are fixed
-
-    // Peaks lookup to create Bounding Boxes
-    var i = 0
-    var curBB: BoundingBox = null
+    // FIXME: how should we store empty spectra? should we create empty entries in existing BBs?
     var bbFirstSpectrumId = 0L
+    if (peaksCount == 0) {
+      val curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(0, 0, mzInc)
+      bbFirstSpectrumId = curBB.spectrumIds.head
+    } else {
+      // FIXME: min m/z should be retrieve from meta-data (scan list)
+      var curMinMz = math.round(sd.getMzAt(0) / bbSizes.BB_MZ_HEIGHT_MS1).toInt * bbSizes.BB_MZ_HEIGHT_MS1.toFloat
 
-    while (i < peaksCount) {
-      val mz = sd.getMzAt(i)
+      //println(s"msLevel is $msLevel; min m/z is: $curMinMz")
 
-      if (i == 0) {
-        curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
-        bbFirstSpectrumId = curBB.spectrumIds.head
+      var curMaxMz = curMinMz + mzInc
+
+      // FIXME: this is a workaround => find a better way to do this
+      if (msLevel == 2 && !isDIA) {
+        curMinMz = 0
+        curMaxMz = bbSizes.BB_MZ_HEIGHT_MSn.toFloat
       }
-      else if (mz > curMaxMz) {
-        // Creates new bounding boxes even for empty data => should be removed in mzDB V2
-        while (mz > curMaxMz) {
-          curMinMz += mzInc
-          curMaxMz += mzInc
 
-          // Very important: ensure run slices are created in increasing m/z order
-          val runSliceBoundaries = (msLevel, curMinMz, curMaxMz)
-          if (!_runSliceStructureFactory.hasRunSlice(runSliceBoundaries))
-            _runSliceStructureFactory.addRunSlice(runSliceBoundaries)
+      //println(s"msLevel is $msLevel; retained m/z range: $curMinMz/$curMaxMz")
+
+      val isTimeForNewBBRow = _bbCache.isTimeForNewBBRow(msLevel, isolationWindowOpt, spectrumTime)
+
+      // Flush BB row when we reach a new row (retention time exceeding size of the bounding box for this MS level)
+      if (isTimeForNewBBRow) {
+        //println("******************************************************* FLUSHING BB ROW ****************************************")
+        _flushBBRow(msLevel, isolationWindowOpt)
+      }
+
+      // TODO: put _getBBWithNextSpectrumSlice back here when memory issues are fixed
+
+      // Peaks lookup to create Bounding Boxes
+      var i = 0
+      var curBB: BoundingBox = null
+
+      while (i < peaksCount) {
+        val mz = sd.getMzAt(i)
+
+        if (i == 0) {
+          curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
+          bbFirstSpectrumId = curBB.spectrumIds.head
+        }
+        else if (mz > curMaxMz) {
+          // Creates new bounding boxes even for empty data => should be removed in mzDB V2
+          while (mz > curMaxMz) {
+            curMinMz += mzInc
+            curMaxMz += mzInc
+
+            // Very important: ensure run slices are created in increasing m/z order
+            val runSliceBoundaries = (msLevel, curMinMz, curMaxMz)
+            if (!_runSliceStructureFactory.hasRunSlice(runSliceBoundaries))
+              _runSliceStructureFactory.addRunSlice(runSliceBoundaries)
+          }
+
+          curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
         }
 
-        curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(i, curMinMz, curMaxMz)
-      }
+        if (curBB.spectrumSlices.last.isDefined) {
+          // Add data point to the Bounding Box
+          val lastSpectrumSlice = curBB.spectrumSlices.last.get
+          lastSpectrumSlice.lastPeakIdx = i
+        }
 
-      if (curBB.spectrumSlices.last.isDefined) {
-        // Add data point to the Bounding Box
-        val lastSpectrumSlice = curBB.spectrumSlices.last.get
-        lastSpectrumSlice.lastPeakIdx = i
+        i += 1
       }
-
-      i += 1
     }
 
     // --- INSERT SPECTRUM HEADER --- //

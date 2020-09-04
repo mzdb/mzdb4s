@@ -35,7 +35,7 @@ case class SpectrumHeader(
   @BeanProperty basePeakIntensity: Float,
   @BeanProperty precursorMz: Option[Double],
   @BeanProperty precursorCharge: Option[Int],
-  @BeanProperty bbFirstSpectrumId: Int,
+  @BeanProperty bbFirstSpectrumId: Long,
   @BeanProperty var scanList: ScanList = null, // TODO: change to Option[ScanList]
   @BeanProperty var precursor: Precursor = null, // TODO: change to Option[Precursor]
   @BeanProperty var isolationWindow: Option[IsolationWindow] = None

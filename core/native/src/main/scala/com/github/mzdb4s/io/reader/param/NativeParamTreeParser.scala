@@ -2,14 +2,14 @@ package com.github.mzdb4s.io.reader.param
 
 import com.github.mzdb4s.db.model.params._
 
-object ParamTreeParser extends IParamTreeParser {
+object NativeParamTreeParser extends IParamTreeParser {
 
   def parseParamTree(paramTreeAsStr: String): ParamTree = {
-    ParamTreeParserImpl.parseParamTree(paramTreeAsStr)
+    NativeParamTreeParserImpl.parseParamTree(paramTreeAsStr)
   }
 
   def parseScanList(scanListAsStr: String): ScanList = {
-    ParamTreeParserImpl.parseScanList(scanListAsStr)
+    NativeParamTreeParserImpl.parseScanList(scanListAsStr)
   }
 
   def parsePrecursor(precursorAsStr: String): Precursor = {

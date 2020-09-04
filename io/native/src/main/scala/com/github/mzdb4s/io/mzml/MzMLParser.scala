@@ -232,8 +232,8 @@ class MzMLParser(file: File) extends java.io.Closeable {
     // FIXME: create alternative DEs for NO LOSS mode (64-bit intensities)
     val profileHighResDE = DataEncoding(id = 1, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
     val profileLowResDE = DataEncoding(id = 2, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
-    val centroidedHighResDE = DataEncoding(id = 3, mode = DataMode.CENTROIDED, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
-    val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROIDED, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
+    val centroidedHighResDE = DataEncoding(id = 3, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
+    val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
 
     val paramTreeCStrBuilder = CStringBuilder.create()
 

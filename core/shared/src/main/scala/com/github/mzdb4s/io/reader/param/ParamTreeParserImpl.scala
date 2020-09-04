@@ -60,13 +60,6 @@ private[param] object ParamTreeParserImpl {
     paramTree
   }
 
-  /*private def _parseAbstractParam[T <: AbstractParam](attributes: collection.Map[String,String], param: T): T = {
-    param
-      .setCvRef(attributes.get("cvRef").orNull)
-      .setAccession(attributes.get("accession").orNull)
-      .setName(attributes.get("name").orNull)
-  }*/
-
   private def _parseCvParam(attributes: collection.Map[String,String]): CVParam = {
     CVParam(
       accession = attributes.get("accession").orNull,
@@ -96,7 +89,86 @@ private[param] object ParamTreeParserImpl {
 
   @inline
   def parseScanList(scanListAsStr: String): ScanList = {
-    null
+
+    // TODO: put this in unit tests
+    """<scanList count="1">
+      |  <cvParam cvRef="MS" accession="MS:1000795" value="" name="no combination" />
+      |  <scan instrumentConfigurationRef="IC2">
+      |    <cvParam cvRef="MS" accession="MS:1000016" value="0.035155" name="scan start time" unitAccession="UO:0000031" unitName="minute" unitCvRef="UO" />
+      |    <cvParam cvRef="MS" accession="MS:1000512" value="ITMS + c NSI d Full ms2 776.30@cid30.00 [200.00-2000.00]" name="filter string" />
+      |    <cvParam cvRef="MS" accession="MS:1000927" value="100" name="ion injection time" unitAccession="UO:0000028" unitName="millisecond" unitCvRef="UO" />
+      |    <userParam name="[Thermo Trailer Extra]Monoisotopic M/Z:" type="xsd:float" value="776.2991" />
+      |    <scanWindowList count="1">
+      |      <scanWindow>
+      |        <cvParam cvRef="MS" accession="MS:1000501" value="200" name="scan window lower limit" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |        <cvParam cvRef="MS" accession="MS:1000500" value="2000" name="scan window upper limit" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |      </scanWindow>
+      |    </scanWindowList>
+      |  </scan>
+      |</scanList>
+      |
+      |""".stripMargin
+
+    val xmlTree = pine.internal.HtmlParser.fromString(scanListAsStr, xml = true)
+
+    val scansCount = xmlTree.attributes.get("count").map(_.toInt).getOrElse(0)
+    val scanList = new ScanList(scansCount)
+
+    val cvParams = xmlTree.filterChildren(_.tagName == "cvParam").map { cvParam =>
+      _parseCvParam(cvParam.attributes)
+    }
+    val userParams = xmlTree.filterChildren(_.tagName == "userParam").map { userParam =>
+      _parseUserParam(userParam.attributes)
+    }
+
+    scanList.setCVParams(cvParams)
+    scanList.setUserParams(userParams)
+
+    val scanParamTrees = xmlTree.filterChildren(_.tagName == "scan").map(_parseScanParamTree)
+    scanList.setScans(scanParamTrees)
+
+    assert(scansCount == scanParamTrees.length, "invalid scansCount")
+
+    scanList
+  }
+
+  private def _parseScanParamTree(scanXmlTree: Tag[Singleton]): ScanParamTree = {
+    val scanParamTree = new ScanParamTree(scanXmlTree.attributes.getOrElse("instrumentConfigurationRef", ""))
+
+    val cvParams = scanXmlTree.filterChildren(_.tagName == "cvParam").map { cvParam =>
+      _parseCvParam(cvParam.attributes)
+    }
+    val userParams = scanXmlTree.filterChildren(_.tagName == "userParam").map { userParam =>
+      _parseUserParam(userParam.attributes)
+    }
+
+    scanParamTree.setCVParams(cvParams)
+    scanParamTree.setUserParams(userParams)
+
+    val scanWindowListTreeOpt = scanXmlTree.findFirstChildNamed("scanWindowList")
+    if (scanWindowListTreeOpt.isDefined) {
+      val scanWindowListTree = scanWindowListTreeOpt.get
+      val scanWindowsCount = scanWindowListTree.attributes.get("count").map(_.toInt).getOrElse(0)
+
+      val scanWindowList = new ScanWindowList(scanWindowsCount)
+      val scanWindows = scanWindowListTree.filterChildren(_.tagName == "scanWindow").map { scanWindowTree =>
+        val scanWindow = new ScanWindow()
+        scanWindow.setCVParams(
+          scanWindowTree.filterChildren(_.tagName == "cvParam").map { cvParam =>
+            _parseCvParam(cvParam.attributes)
+          }
+        )
+
+        scanWindow
+      }
+      assert(scanWindowsCount == scanWindows.length, "invalid scanWindowsCount")
+
+      scanWindowList.setScanWindows(scanWindows)
+
+      scanParamTree.setScanWindowList(scanWindowList)
+    }
+
+    scanParamTree
   }
 
   @inline

@@ -21,7 +21,7 @@ case class CVParam(
 ) extends IXmlParam {
   def toXml(): String = {
     if (unitName.isDefined) {
-      s"""<cvParam cvRef="$cvRef" accession="$accession" name="$name" value="$value" unitCvRef="$unitCvRef" unitAccession="$unitAccession" unitName="$unitName" />"""
+      s"""<cvParam cvRef="$cvRef" accession="$accession" name="$name" value="$value" unitCvRef="${unitCvRef.get}" unitAccession="${unitAccession.get}" unitName="${unitName.get}" />"""
     } else {
       s"""<cvParam cvRef="$cvRef" accession="$accession" name="$name" value="$value" />"""
     }
