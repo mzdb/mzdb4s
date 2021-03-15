@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.iterator2
+/*package com.github.mzdb4s.io.reader.iterator2
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -54,4 +54,4 @@ abstract class AbstractRunSliceIterator protected(
 
     RunSlice(rsh, rsd)
   }
-}
+}*/

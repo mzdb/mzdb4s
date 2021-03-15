@@ -1,5 +1,6 @@
 package com.github.mzdb4s.msdata.builder
 
+import scala.collection.Seq
 import com.github.mzdb4s.msdata._
 
 trait ISpectrumBuilder extends ISpectrumDataAdder {

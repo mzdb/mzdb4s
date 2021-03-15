@@ -54,6 +54,8 @@ abstract class AbstractMzDbWriter extends Logging {
 
   protected def bboxInsertStmt: ISQLiteStatement = _bboxInsertStmt
 
+  protected def formatDateToISO8601String(date: java.util.Date) : String
+
   /**
     * Gets the connection.
     *
@@ -77,6 +79,7 @@ abstract class AbstractMzDbWriter extends Logging {
     this._connection.exec("PRAGMA automatic_index=OFF;")
     this._connection.exec("PRAGMA locking_mode=EXCLUSIVE;") // we want to lock file access for the whole creation process
 
+    this._connection.exec("PRAGMA foreign_keys=OFF;") // FIXME: there is an issue with tmp_spectrum that need to be solved to enable this
     this._connection.exec("PRAGMA ignore_check_constraints=ON;") // to be a little bit faster (should be OFF in dev mode)
 
     // Create a temporary table containing a copy of the spectrum table
@@ -187,12 +190,15 @@ abstract class AbstractMzDbWriter extends Logging {
 
       this._connection.dispose()
 
-      // Update sqlite_sequence table using a fresh connection
-      // DBO: I don't why but it doesn't work inside the previous connection
-      this._connection = sf.newSQLiteConnection(dbLocation)
-      this._connection.open(allowCreate = false)
-      this._connection.exec(s"INSERT INTO sqlite_sequence VALUES ('spectrum',${_insertedSpectraCount});")
-      this._connection.dispose()
+      if (!this._connection.isMemoryDatabase()) {
+        // Update sqlite_sequence table using a fresh connection
+        // DBO: I don't why but it doesn't work inside the previous connection
+        this._connection = sf.newSQLiteConnection(dbLocation)
+        this._connection.open(allowCreate = false)
+        this._connection.exec(s"INSERT INTO sqlite_sequence VALUES ('spectrum',${_insertedSpectraCount});")
+        this._connection.dispose()
+      }
+
     }
   }
 
@@ -242,7 +248,7 @@ abstract class AbstractMzDbWriter extends Logging {
     for (instConfig <- instConfigs; if instConfig.getComponentList != null) {
       stmt.bind(1, instConfig.getName)
       stmt.bind(2, _xmlSerializer.serializeComponentList(instConfig.getComponentList))
-      stmt.bind(3, instConfig.getSoftwareId)
+      stmt.bind(3, instConfig.getSoftwareId.getOrElse(1)) // FIXME: softwareId required in mzDB but not in mzML
       stmt.step()
       stmt.reset()
     }
@@ -295,11 +301,8 @@ abstract class AbstractMzDbWriter extends Logging {
 
     stmt.bind(1, AbstractMzDbWriter.MODEL_VERSION)
     stmt.bind(2, (new java.util.Date().getTime / 1000).toInt)
-    stmt.bind(3, "") // FIXME: retrieve the file_content field
+    stmt.bind(3, _xmlSerializer.serializeFileContent(mzDbHeader.fileContent))
     stmt.bind(4, "") // FIXME: define contacts in the mzDB file
-
-    //if (mzDbParamTreeOpt.isEmpty) stmt.bindNull(5)
-    //else stmt.bind(5, _xmlSerializer.serializeParamTree(mzdbHeaderParams))
 
     val serializedMzDbParamTree = _xmlSerializer.serializeParamTree(mzdbHeaderParams)
     //println(serializedMzDbParamTree)
@@ -314,12 +317,9 @@ abstract class AbstractMzDbWriter extends Logging {
     val runs = metaData.getRuns
     for (run <- runs) {
       stmt.bind(1, run.getName)
-      // FIXME: output the DateTime in the good format
-      //println(run.getStartTimestamp.toString)
-      //stmt.bind(2, java.sql.TimestampUtils.getISO8601StringForDate(run.getStartTimestamp))
-      stmt.bind(2, "2015-02-05T19:30:47Z")
+      stmt.bind(2, formatDateToISO8601String(run.getStartTimestamp))
 
-      if (run.getParamTree().isEmpty) stmt.bind(3, "<params />")
+      if (run.getParamTree().isEmpty) stmt.bind(3, "<params />") // FIXME: bindNull
       else stmt.bind(3, _xmlSerializer.serializeParamTree(run.getParamTree().get))
 
       // FIXME: do not use default values
@@ -339,7 +339,7 @@ abstract class AbstractMzDbWriter extends Logging {
     val samples = metaData.getSamples
     for (sample <- samples) {
       stmt.bind(1, sample.getName)
-      if (sample.getParamTree.isEmpty) stmt.bind(2, "<params />")
+      if (sample.getParamTree.isEmpty) stmt.bind(2, "<params />") // FIXME: bindNull
       else stmt.bind(2, _xmlSerializer.serializeParamTree(sample.getParamTree.get))
       stmt.step()
       stmt.reset()
@@ -377,7 +377,8 @@ abstract class AbstractMzDbWriter extends Logging {
     ()
   }
 
-  def insertSpectrum(spectrum: Spectrum, metaDataAsText: SpectrumXmlMetaData, dataEncoding: DataEncoding): Unit = { // --- INSERT SPECTRUM DATA --- //
+  // --- INSERT SPECTRUM DATA --- //
+  def insertSpectrum(spectrum: Spectrum, metaDataAsText: SpectrumXmlMetaData, dataEncoding: DataEncoding): Unit = {
 
     val sh = spectrum.getHeader
     val sd = spectrum.getData
@@ -496,7 +497,10 @@ abstract class AbstractMzDbWriter extends Logging {
     stmt.bind(15, smd.scanList)
 
     if (smd.precursorList.isEmpty) stmt.bindNull(16)
-    else stmt.bind(16, smd.precursorList.get)
+    else {
+      val precList = smd.precursorList.get
+      stmt.bind(16, precList)
+    }
 
     if (smd.productList.isEmpty) stmt.bindNull(17)
     else stmt.bind(17, smd.productList.get)
@@ -788,7 +792,7 @@ case class SpectrumDataBuilder( // actually used to ceate a spectrum slice
 
 }*/
 
-private[this] case class SpectrumSliceIndex(
+private[writer] case class SpectrumSliceIndex(
   spectrumData: ISpectrumData,
   var firstPeakIdx: Int,
   var lastPeakIdx: Int
@@ -800,7 +804,7 @@ private[this] case class SpectrumSliceIndex(
   }
 }
 
-private[this] case class BoundingBox(
+private[writer] case class BoundingBox(
   var id: Int = 0,
   var firstTime: Float = 0f,
   var lastTime: Float = 0f,
@@ -812,7 +816,7 @@ private[this] case class BoundingBox(
   var spectrumSlices: ArrayBuffer[Option[SpectrumSliceIndex]] = null
 )
 
-private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
+private[writer] class BoundingBoxWriterCache(bbSizes: BBSizes) {
 
   private var bbId = 0
 
@@ -982,7 +986,7 @@ private[this] class BoundingBoxWriterCache(bbSizes: BBSizes) {
 }
 
 // TODO: move to model package?
-private[this] class RunSliceStructureFactory(runId: Int) {
+private[writer] class RunSliceStructureFactory(runId: Int) {
   private val runSlicesStructure = new HashMap[(Int,Float,Float), RunSliceHeader]
   private val runSliceById = new LongMap[RunSliceHeader]()
 
@@ -1030,7 +1034,7 @@ private[this] class RunSliceStructureFactory(runId: Int) {
   def getRunSlicesCount(): Int = runSliceById.size
 }
 
-private[this] class DataEncodingRegistry() {
+private[writer] class DataEncodingRegistry() {
   private val dataEncodingMap = new HashMap[(DataMode.Value, PeakEncoding.Value), DataEncoding]
 
   private var dataEncodingId = 0

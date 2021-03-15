@@ -1,7 +1,5 @@
 package com.github.mzdb4s.io.reader.bb
 
-import java.nio.ByteBuffer
-
 import com.github.mzdb4s.msdata._
 
 /**
@@ -33,8 +31,8 @@ abstract class AbstractBlobReader /*protected(
   protected var _spectrumSliceStartPositions: Array[Int] = null // list of spectrum slice starting positions in the blob
   protected var _peaksCounts: Array[Int] = null // number of peaks in each spectrum slice of the blob
 
-  override def getAllSpectrumIds: Array[Long] = {
-    val spectraCount = this.getSpectraCount
+  override def getAllSpectrumIds(): Array[Long] = {
+    val spectraCount = this.getSpectraCount()
     val spectrumIds = new Array[Long](spectraCount)
 
     var i = 0
@@ -47,24 +45,26 @@ abstract class AbstractBlobReader /*protected(
   }
 
   /**
-    * Read spectrum slice data by using a ByteBuffer as input
+    * Read spectrum slice data by using a IByteArrayWrapper as input
     *
-    * @param bbByteBuffer          array of bytes containing the SpectrumSlices of interest
-    * @param spectrumSliceStartPos , the starting position
-    * @param peaksBytesLength      , length of bytes used by peaks
-    * @param de                    , the corresponding DataEncoding
-    * @param minMz                 , the minimum m/z value
-    * @param maxMz                 , the maximum m/z value
+    * @param byteArrayWrapper      array of bytes containing the SpectrumSlices of interest
+    * @param spectrumSliceStartPos the starting position
+    * @param peaksBytesLength      length of bytes used by peaks
+    * @param de                    the corresponding DataEncoding
+    * @param minMz                 the minimum m/z value
+    * @param maxMz                 the maximum m/z value
     * @return
     */
   protected def readSpectrumSliceData(
-    bbByteBuffer: ByteBuffer,
+    byteArrayWrapper: IByteArrayWrapper,
     spectrumSliceStartPos: Int,
     peaksBytesLength: Int,
     de: DataEncoding,
     minMz: Double,
     maxMz: Double
   ): SpectrumData = {
+
+    //return new SpectrumData(Array(), Array())
 
     val dataMode = de.getMode
     val pe = de.getPeakEncoding
@@ -89,11 +89,11 @@ abstract class AbstractBlobReader /*protected(
         val peakStartPos = spectrumSliceStartPos + i
         val mz = pe match {
           case PeakEncoding.HIGH_RES_PEAK =>
-            bbByteBuffer.getDouble(peakStartPos)
+            byteArrayWrapper.getDouble(peakStartPos)
           case PeakEncoding.LOW_RES_PEAK =>
-            bbByteBuffer.getFloat(peakStartPos).toDouble
+            byteArrayWrapper.getFloat(peakStartPos).toDouble
           case PeakEncoding.NO_LOSS_PEAK =>
-            bbByteBuffer.getDouble(peakStartPos)
+            byteArrayWrapper.getDouble(peakStartPos)
         }
 
         // Check if we are in the desired m/z range
@@ -107,8 +107,8 @@ abstract class AbstractBlobReader /*protected(
       }
     }
 
-    // Set the position of the byte buffer
-    bbByteBuffer.position(peaksStartIdx)
+    // Set the position of the byte array
+    byteArrayWrapper.position(peaksStartIdx)
 
     // Create new arrays of primitives
     val mzArray = new Array[Double](peaksCount)
@@ -120,25 +120,25 @@ abstract class AbstractBlobReader /*protected(
     while (peakIdx < peaksCount) {
       pe match {
         case PeakEncoding.HIGH_RES_PEAK =>
-          mzArray(peakIdx) = bbByteBuffer.getDouble
-          intensityArray(peakIdx) = bbByteBuffer.getFloat
+          mzArray(peakIdx) = byteArrayWrapper.getDouble()
+          intensityArray(peakIdx) = byteArrayWrapper.getFloat()
         case PeakEncoding.LOW_RES_PEAK =>
-          mzArray(peakIdx) = bbByteBuffer.getFloat.toDouble
-          intensityArray(peakIdx) = bbByteBuffer.getFloat
+          mzArray(peakIdx) = byteArrayWrapper.getFloat().toDouble
+          intensityArray(peakIdx) = byteArrayWrapper.getFloat()
         case PeakEncoding.NO_LOSS_PEAK =>
-          mzArray(peakIdx) = bbByteBuffer.getDouble
-          intensityArray(peakIdx) = bbByteBuffer.getDouble.toFloat
+          mzArray(peakIdx) = byteArrayWrapper.getDouble()
+          intensityArray(peakIdx) = byteArrayWrapper.getDouble().toFloat
       }
       if (dataMode == DataMode.FITTED) {
-        lwhmArray(peakIdx) = bbByteBuffer.getFloat
-        rwhmArray(peakIdx) = bbByteBuffer.getFloat
+        lwhmArray(peakIdx) = byteArrayWrapper.getFloat()
+        rwhmArray(peakIdx) = byteArrayWrapper.getFloat()
       }
 
       peakIdx += 1
     }
 
     // return the newly formed SpectrumData
-    new SpectrumData(mzArray, intensityArray, lwhmArray, rwhmArray)
+    SpectrumData(mzArray, intensityArray, lwhmArray, rwhmArray)
   }
 
   @throws[IndexOutOfBoundsException]
@@ -156,6 +156,28 @@ abstract class AbstractBlobReader /*protected(
   override def readAllSpectrumSlices(runSliceId: Int): Array[SpectrumSlice] = {
     val spectraCount = this.getSpectraCount()
     val sl = new Array[SpectrumSlice](spectraCount)
+
+    /*println("spectrum IDs:",firstSpectrumId,lastSpectrumId)
+    println("runSliceId:" + runSliceId)
+    println("spectraCount: " + spectraCount)*/
+
+    /*val startTime = System.currentTimeMillis
+    var j = 0
+
+    while (j < 10000) {
+      j += 1
+
+      var i = 0
+      while (i < spectraCount) {
+        val s = this.readSpectrumSliceAt(i)
+        s.setRunSliceId(runSliceId)
+        sl(i) = s
+        i += 1
+      }
+    }
+
+    val took = System.currentTimeMillis - startTime
+    println("readSpectrumSliceAt took : " + took)*/
 
     var i = 0
     while (i < spectraCount) {

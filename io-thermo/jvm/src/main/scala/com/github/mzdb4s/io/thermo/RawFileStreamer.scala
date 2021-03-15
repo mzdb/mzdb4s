@@ -1,11 +1,10 @@
 package com.github.mzdb4s.io.thermo
 
 import com.sun.jna._
-import java.io.File
 
+import java.io.File
 import thermorawfileparser.thermorawfileparser._
 import thermorawfileparser.thermorawfileparser.writer.MzMlSpectrumWriter
-
 import com.github.mzdb4s.io.reader.param._
 
 class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFileStreamer(rawFilePath) {
@@ -41,10 +40,15 @@ class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFile
 
     val wrappedSpectrum = _mzMlWriter.getSpectrumWrapper
 
+    // See:
     // https://stackoverflow.com/questions/43338842/c-sharp-out-intptr-equivalent-in-java
     // https://stackoverflow.com/questions/5244214/get-pointer-of-byte-array-in-jna
     // https://stackoverflow.com/questions/40156310/jna-free-memory-created-in-the-shared-object-dll
     // https://stackoverflow.com/questions/1318682/intptr-arithmetics
+    var prevXmlChunkLen = 10000
+    var xmlChunkPtr = new Memory(prevXmlChunkLen)
+    var xmlChunkAddress: Long = Pointer.nativeValue(xmlChunkPtr)
+
     var prevPtrPeaksCount = 10000
     var mzPtr: Pointer = new Memory(prevPtrPeaksCount * 8)
     var intensityPtr: Pointer = new Memory(prevPtrPeaksCount * 8)
@@ -62,19 +66,48 @@ class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFile
       _mzMlWriter.resetWriter(false)
       _mzMlWriter.writeSpectrumNoReturn(sNum, sNum, false)
 
+      //val xmlStr = _mzMlWriter.getInMemoryStreamAsString
+
+      val xmlChunkLen = _mzMlWriter.flushWriterThenGetXmlStreamLength()
+
+      if (xmlChunkLen > prevXmlChunkLen) {
+        logger.debug(s"Reallocating XML chunk buffer to accept $xmlChunkLen chars")
+        //Native.free(xmlChunkAddress)
+
+        xmlChunkPtr = new Memory(xmlChunkLen)
+        xmlChunkAddress = Pointer.nativeValue(xmlChunkPtr)
+        prevXmlChunkLen = xmlChunkLen
+      }
+
+      val xmlStrAsBytes = if (xmlChunkLen == 0) Array.empty[Byte]
+      else {
+        //println("before")
+        _mzMlWriter.copyXmlStreamToPointers(xmlChunkAddress)
+        //println("after")
+
+        val bytes = new Array[Byte](xmlChunkLen)
+        xmlChunkPtr.read(0, bytes, 0, xmlChunkLen)
+        bytes
+      }
+
+      val xmlStr = new String(xmlStrAsBytes, java.nio.charset.StandardCharsets.UTF_8)
+      //println("ok")
+      //println(xmlStr)
+
+      // FIXME: retrieve the initial ID from C# (SpectrumWrapper class)
+      val (xmlMetaData, spectrumTitle) = parseSpectrumXmlMetaData(spectrumId, xmlStr)
+      //if (sNum == 2) println(xmlStr.replaceAll("""xmlns=".+?"""",""))
+
       val peaksCount = wrappedSpectrum.getPeaksCount
       //println("peaksCount",peaksCount)
-
-      val xmlStr = _mzMlWriter.getInMemoryStreamAsString
-      //if (sNum == 2) println(xmlStr.replaceAll("""xmlns=".+?"""",""))
 
       var mzList: Array[Double] = null
       var intensityList: Array[Double] = null
 
       if (peaksCount > prevPtrPeaksCount) {
-        println(s"Reallocating mz/int buffer to accept $prevPtrPeaksCount peaks")
-        Native.free(mzPtrAddress)
-        Native.free(intensityPtrAddress)
+        logger.debug(s"Reallocating mz/int buffer to accept $prevPtrPeaksCount peaks")
+        //Native.free(mzPtrAddress)
+        //Native.free(intensityPtrAddress)
 
         val newBuffSize = peaksCount * 8
         mzPtr = new Memory(newBuffSize)
@@ -87,15 +120,18 @@ class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFile
       }
 
       if (peaksCount > 0) {
+        //println("before")
         wrappedSpectrum.copyDataToPointers(mzPtrAddress, intensityPtrAddress)
         //println( mzPtr.getDouble( (peaksCount - 1) * 8) )
         //println(wrappedSpectrum.getMzValue(peaksCount - 1))
 
-        val mzList = new Array[Double](peaksCount)
-        val intensityList = new Array[Double](peaksCount)
+        mzList = new Array[Double](peaksCount)
+        intensityList = new Array[Double](peaksCount)
 
         mzPtr.read(0, mzList, 0, peaksCount)
         intensityPtr.read(0, intensityList, 0, peaksCount)
+
+        //println("after")
 
         /*val buffSize = peaksCount * 8
         var peakIdx = 0
@@ -114,8 +150,6 @@ class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFile
         intensityList = Array()
       }
 
-      // FIXME: retrieve the initial ID from C# (SpectrumWrapper class)
-      val (xmlMetaData, spectrumTitle) = parseSpectrumXmlMetaData(spectrumId, xmlStr)
       val msLevel = getMsLevel(xmlMetaData)
 
       if (msLevel == 1 ) msCycle += 1
@@ -137,8 +171,10 @@ class RawFileStreamer private[thermo](rawFilePath: File) extends AbstractRawFile
       sNum += 1
     }
 
-    Native.free(mzPtrAddress)
-    Native.free(intensityPtrAddress)
+    // FIXME: it seems to fail on windows
+    //Native.free(xmlChunkAddress)
+    //Native.free(mzPtrAddress)
+    //Native.free(intensityPtrAddress)
 
     _rawFileWrapper.dispose()
     _rawFileWrapper = null

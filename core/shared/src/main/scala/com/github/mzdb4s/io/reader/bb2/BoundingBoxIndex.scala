@@ -1,27 +1,27 @@
-package com.github.mzdb4s.io.reader.bb2
+/*package com.github.mzdb4s.io.reader.bb2
 
 import com.github.mzdb4s.msdata.DataEncoding
-import com.github.mzdb4s.util.collection.ResizedArray
+//import com.github.mzdb4s.util.collection.ResizedArray // replaced by IndexedSeqView but never tested
 
 import scala.collection.mutable.LongMap
-import scala.collection.mutable.WrappedArray
+import scala.collection.mutable.IndexedSeqView
 
 private[bb2] class BoundingBoxIndex(
   dataEncodingBySpectrumId: LongMap[DataEncoding]
 )(implicit bbIdxFactory: BoundingBoxIndexFactory) {
 
   protected var _spectraCount = 0 // number of spectrum slices in the blob
-  protected var _spectrumSliceStartPositions: WrappedArray[Int] = _ // list of spectrum slice starting positions in the blob
-  protected var _peaksCounts: WrappedArray[Int] = _ // number of peaks in each spectrum slice of the blob
+  protected var _spectrumSliceStartPositions: IndexedSeqView[Int,Array[Int]] = _ // list of spectrum slice starting positions in the blob
+  protected var _peaksCounts: IndexedSeqView[Int,Array[Int]] = _ // number of peaks in each spectrum slice of the blob
 
   private def _ensureSpectraCount(spectraCount: Int): Unit = {
-    if (_spectrumSliceStartPositions == null || spectrumSliceStartPositions.length < spectraCount) _spectrumSliceStartPositions = new Array[Int](spectraCount)
-    if (_peaksCounts == null || _peaksCounts.length < spectraCount) _peaksCounts = new Array[Int](spectraCount)
+    if (_spectrumSliceStartPositions == null || spectrumSliceStartPositions.length < spectraCount) _spectrumSliceStartPositions = new Array[Int](spectraCount).view
+    if (_peaksCounts == null || _peaksCounts.length < spectraCount) _peaksCounts = new Array[Int](spectraCount).view
   }
 
   @inline def spectraCount: Int = _spectraCount
-  @inline def spectrumSliceStartPositions: WrappedArray[Int] = _spectrumSliceStartPositions
-  @inline def peaksCounts: WrappedArray[Int] = _peaksCounts
+  @inline def spectrumSliceStartPositions: Seq[Int] = _spectrumSliceStartPositions
+  @inline def peaksCounts: Seq[Int] = _peaksCounts
 
   def indexSpectrumSlices(
     firstSpectrumId: Long,
@@ -59,10 +59,12 @@ private[bb2] class BoundingBoxIndex(
 
     // Resize arrays if needed
     if (_spectrumSliceStartPositions.length > _spectraCount)
-      _spectrumSliceStartPositions = new ResizedArray.ofInt(_spectrumSliceStartPositions.array, _spectraCount)
+      //_spectrumSliceStartPositions = new ResizedArray.ofInt(_spectrumSliceStartPositions.array, _spectraCount)
+      _spectrumSliceStartPositions = _spectrumSliceStartPositions.slice(0 , _spectraCount)
 
     if (_peaksCounts.length > _spectraCount) {
-      _peaksCounts = new ResizedArray.ofInt(_peaksCounts.array, _spectraCount)
+      //_peaksCounts = new ResizedArray.ofInt(_peaksCounts.array, _spectraCount)
+      _peaksCounts = _peaksCounts.slice(0, _spectraCount)
     }
 
     this
@@ -76,4 +78,4 @@ private[bb2] class BoundingBoxIndex(
     }
   }
 
-}
+}*/

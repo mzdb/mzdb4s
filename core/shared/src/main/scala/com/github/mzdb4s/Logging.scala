@@ -2,6 +2,7 @@ package com.github.mzdb4s
 
 import scribe._
 import scribe.filter._
+import scribe.output.format.ASCIIOutputFormat
 
 // Used to abstract Logging from used library
 trait Logging extends scribe.Logging
@@ -28,7 +29,8 @@ object Logging {
     })
 
     val logger = scribe.Logger.root.clearHandlers().clearModifiers().withHandler(
-      minimumLevel = scribeMinLogLevelOpt
+      minimumLevel = scribeMinLogLevelOpt,
+      outputFormat = ASCIIOutputFormat
     )
 
     if (scribeMinLogLevelOpt.isDefined) {

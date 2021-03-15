@@ -4,7 +4,6 @@ import scala.collection.mutable.LongMap
 
 import com.github.mzdb4s.MzDbReader
 import com.github.mzdb4s.io.MzDbContext
-import com.github.mzdb4s.io.reader.param.ParamTreeParser
 import com.github.mzdb4s.msdata.SpectrumHeader
 import com.github.sqlite4s.SQLiteQuery
 import com.github.sqlite4s.query.SQLiteRecord
@@ -37,7 +36,7 @@ object SpectrumHeaderReader {
     for (header <- spectrumHeaders) {
       if (!header.hasParamTree) {
         val paramTreeAsStr = paramTreeBySpecId(header.getId)
-        if (paramTreeAsStr != null) header.setParamTree( ParamTreeParser.parseParamTree(paramTreeAsStr) )
+        if (paramTreeAsStr != null) header.setParamTree(mzdbCtx.paramTreeParser.parseParamTree(paramTreeAsStr) )
       }
     }
   }
@@ -48,7 +47,7 @@ object SpectrumHeaderReader {
     for (header <- spectrumHeaders) {
       if (header.scanList == null) {
         val scanListAsStr = scanListBySpecId(header.getId)
-        if (scanListAsStr != null) header.scanList = ParamTreeParser.parseScanList(scanListAsStr)
+        if (scanListAsStr != null) header.scanList = mzdbCtx.paramTreeParser.parseScanList(scanListAsStr)
       }
     }
   }
@@ -59,7 +58,7 @@ object SpectrumHeaderReader {
     for (header <- spectrumHeaders) {
       if (header.precursor == null) {
         val precursorAsStr = precursorBySpecId(header.getId)
-        if (precursorAsStr != null) header.precursor = ParamTreeParser.parsePrecursor(precursorAsStr)
+        if (precursorAsStr != null) header.precursor = mzdbCtx.paramTreeParser.parsePrecursors(precursorAsStr).headOption.orNull
       }
     }
   }

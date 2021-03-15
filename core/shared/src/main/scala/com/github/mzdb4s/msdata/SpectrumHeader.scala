@@ -61,7 +61,7 @@ case class SpectrumHeader(
   }
 
   def getOrLoadPrecursor()(implicit mzdbCtx: MzDbContext): Precursor = {
-    if (precursor == null) precursor = mzdbCtx.loadPrecursorList(this.id)
+    if (precursor == null) precursor = mzdbCtx.loadPrecursorList(this.id).headOption.orNull
     precursor
   }
 

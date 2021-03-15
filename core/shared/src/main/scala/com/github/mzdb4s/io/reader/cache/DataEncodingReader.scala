@@ -1,10 +1,10 @@
 package com.github.mzdb4s.io.reader.cache
 
+import scala.collection.Seq
 import scala.collection.mutable.LongMap
 
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.msdata.DataEncoding
-
 
 class DataEncodingReader(entityCache: Option[MzDbEntityCache] = None)(implicit val mzDbCtx: MzDbContext) extends AbstractDataEncodingReader(entityCache) {
 

@@ -20,5 +20,8 @@ object StrBuilderLib {
   def str_builder_len(sb: Ptr[str_builder_t]): CSize = extern
   def str_builder_peek(sb: Ptr[str_builder_t]): CString = extern
   def str_builder_dump(sb: Ptr[str_builder_t], len: Ptr[CSize]): CString = extern
+
+  def dtoa(v: CDouble, res: CString, decimalPlaces: CInt): Int = extern
+  def ftoa(v: CFloat, res: CString, decimalPlaces: CInt): Int = extern
 }
 

@@ -2,8 +2,10 @@ package com.github.mzdb4s.io.mzml
 
 import java.io.{File, RandomAccessFile}
 
+import scala.collection.Seq
 import scala.collection.mutable.ArrayBuffer
 import scala.scalanative.unsafe._
+import scala.scalanative.unsigned._
 import scala.scalanative.libc.stdio._
 import scala.scalanative.libc.stdlib._
 import scala.scalanative.libc.string._
@@ -107,7 +109,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
         name = "IC1",
         paramTree = null,
         componentList = compListBuilder.toComponentList(),
-        softwareId = 1
+        softwareId = Some(1)
       )
     )
 
@@ -160,6 +162,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
     val sourceFiles = Seq(SourceFile(id = 1, name = "OVEMB150205_12.raw", location = "", paramTree = null))
 
     MzMLMetaData(
+      FileContent(), // FIXME: parse FileContent
       commonInstrumentParams,
       instrumentConfigurations,
       processingMethods,
@@ -187,10 +190,10 @@ class MzMLParser(file: File) extends java.io.Closeable {
       fseek( _opened_file, specIndex.start, SEEK_SET )
 
       // TODO: reuse specBuffer between all iterations ?
-      val specBuffer: Ptr[CChar] = calloc(specIndex.length, 1L)
+      val specBuffer: Ptr[CChar] = calloc(specIndex.length.toULong, 1L.toULong)
       assert(specBuffer != null, "forEachSpectrumChunk: can't allocate memory for specBuffer")
 
-      if (fread(specBuffer, specIndex.length, 1, _opened_file) != 1) {
+      if (fread(specBuffer, specIndex.length.toULong, 1.toULong, _opened_file) != 1.toULong) {
         throw new Exception(s"Error while reading spectrum #$specNumber located at offset ${specIndex.start} in file '$file'")
       }
 
@@ -317,7 +320,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
           //val spectrumCvParams = CUtils.fromCString(chunk.spectrumHeaderChunk + cvParamsOffset, scanListOffset - cvParamsOffset)
           //println( "spectrumCvParams: " + spectrumCvParams)
 
-          paramTreeCStrBuilder.addString(chunk.spectrumHeaderChunk + cvParamsOffset, scanListOffset - cvParamsOffset)
+          paramTreeCStrBuilder.addString(chunk.spectrumHeaderChunk + cvParamsOffset, (scanListOffset - cvParamsOffset).toULong)
           paramTreeCStrBuilder.addString(MzMLParser.paramTreeFooter, MzMLParser.paramTreeFooterLen)
 
           paramTreeStr = CUtils.fromCString(paramTreeCStrBuilder.underlyingString())
@@ -337,7 +340,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
           )
 
           val scanListStrEndPos = scanListEndChunk - scanListChunk + MzMLParser.scanListEndTagLen
-          scanListStr = CUtils.fromCString(scanListChunk, scanListStrEndPos)
+          scanListStr = CUtils.fromCString(scanListChunk, scanListStrEndPos.toULong)
 
           // Make the string prettier
           // TODO: static strings
@@ -355,7 +358,7 @@ class MzMLParser(file: File) extends java.io.Closeable {
             )
 
             val precursorListStrEndPos = precursorListEndChunk - precursorListChunk + MzMLParser.precursorListEndTagLen
-            var precursorListStr = CUtils.fromCString(precursorListChunk, precursorListStrEndPos)
+            var precursorListStr = CUtils.fromCString(precursorListChunk, precursorListStrEndPos.toULong)
 
             // Make the string prettier
             // TODO: static strings???
@@ -735,8 +738,8 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     assert(spectrumHeaderChunk != null, "_parse_chunk: can't allocate memory")
 
     // Copy wanted XML portions (cvParams, meta-data, and spectrumEndTag)
-    memcpy( spectrumHeaderChunk, xml_c_str, offset )
-    memcpy( spectrumHeaderChunk + offset, spectrumEndTag, spectrumEndTagLen )
+    memcpy( spectrumHeaderChunk, xml_c_str, offset.toULong )
+    memcpy( spectrumHeaderChunk + offset, spectrumEndTag, spectrumEndTagLen.toULong )
     spectrumHeaderChunk(spectrumHeaderChunkLen) = CUtils.NULL_CHAR // null terminator!
 
     val mz_binary_sub_str = _substr_binary_xml_chunk(binaryDataArrayListChunk)
@@ -757,12 +760,12 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     val( firstPeakMz, mzPeaksCount ) = if (mzArrayMetaData.is64Bits) {
       val mz_ptr = mzPtrBox.ptr.asInstanceOf[Ptr[CDouble]]
 
-      (mz_ptr(0), mzPtrBox.length / 8)
+      (mz_ptr(0), mzPtrBox.length.toLong / 8L)
 
     } else {
       val mz_ptr = mzPtrBox.ptr.asInstanceOf[Ptr[CFloat]]
 
-      (mz_ptr(0), mzPtrBox.length / 4)
+      (mz_ptr(0), mzPtrBox.length.toLong / 4L)
     }
 
     //println(s"First m/z = $firstPeakMz")
@@ -785,12 +788,12 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     val( firstPeakIntensity, intPeaksCount ) = if (intensityArrayMetaData.is64Bits) {
       val intensity_ptr = intensityPtrBox.ptr.asInstanceOf[Ptr[CDouble]]
 
-      (intensity_ptr(0), intensityPtrBox.length / 8)
+      (intensity_ptr(0), intensityPtrBox.length.toLong / 8L)
 
     } else {
       val intensity_ptr = intensityPtrBox.ptr.asInstanceOf[Ptr[CFloat]]
 
-      (intensity_ptr(0), intensityPtrBox.length / 4)
+      (intensity_ptr(0), intensityPtrBox.length.toLong / 4L)
     }
     //println("PeaksCount = " + intPeaksCount)
 
@@ -839,7 +842,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     //println("encodedLengthCharSum: "+ encodedLengthCharSum)
     val binaryDataArrayMetaDataAsCString: CString = stackalloc[CChar](1024)
     // TODO: avoid copy if possible
-    CUtils.strcpy(binaryDataArrayMetaDataAsCString, binaryDataArrayXmlChunk, metaDataLength)
+    CUtils.strcpy(binaryDataArrayMetaDataAsCString, binaryDataArrayXmlChunk, metaDataLength.toULong)
 
     /*if (id == "controllerType=0 controllerNumber=1 scan=21161") {
       println("length of binaryDataArrayMetaDataAsCString: "+fromCString(binaryDataArrayMetaDataAsCString).length)
@@ -858,7 +861,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
 
     var i = encodedLengthStrLen + 1 // skip 'encodedLength="'
     var foundValue = false
-    var encLen = 0 // TODO: Long value?
+    var encLen = 0L // TODO: Long value?
 
     while (i < 128 && !foundValue) {
       val c = encodedLengthChunk(i)
@@ -896,7 +899,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     }
 
     // FIXME: we don't need a full Map on the list of accession names
-    MzMLBinaryChunkMetaData(encLen, accessions.map(ac => ac -> ("","")) )
+    MzMLBinaryChunkMetaData(encLen.toULong, accessions.map(ac => ac -> ("","")) )
 
     /*
     // Alternative method (DBO):
@@ -931,7 +934,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     var j = 0
     var i = accessionStrLen + 1 // skip 'accession="'
     var foundValue = false
-    val cvParamAC: CString = stackalloc[CChar](10 + 1)
+    val cvParamAC: CString = stackalloc[CChar]((10 + 1).toULong)
     cvParamAC(10) = CUtils.NULL_CHAR
 
     while (i < maxLen && !foundValue) {
@@ -1013,7 +1016,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     val encodedLength = metaData.encodedLength
 
     // Note: we need to calloc 'encodedLength + 1' to allocate space for the NUL terminator
-    val base64_str: CString = calloc( encodedLength + 1, 1L )
+    val base64_str: CString = calloc( encodedLength + 1L.toULong, 1L.toULong)
     assert(base64_str != null, "_parse_vector_from_binary_chunk: can't allocate memory")
 
     // Copy Base64 encoded string to a specific allocated string
@@ -1047,14 +1050,14 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
 
   private def _decode_base64_vector(b64_str: CString): PtrBox = {
     // TODO: if we parse the "defaultArrayLength" value from the spectrum attributes, we could skip the step "calcDecodedStrLen"
-    val decodedStrLen: CSize = Base64Lib.calcDecodedStrLen(b64_str)
+    val decodedStrLen: CSize = Base64Lib.calcDecodedStrLen(b64_str).toULong
     //println("expected decodedStrLen: " + decodedStrLen)
 
     //val vector = calloc(decodedStrLen, 1L)
     val vector = alloc[Byte](decodedStrLen) // caller managed memory
     assert(vector != null, "_decode_base64_vector: can't allocate memory")
 
-    val actualSize: CSize = Base64Lib.decode(vector, b64_str)
+    val actualSize: CSize = Base64Lib.decode(vector, b64_str).toULong
     //println("actualSize: " + actualSize)
 
     PtrBox(vector, actualSize)

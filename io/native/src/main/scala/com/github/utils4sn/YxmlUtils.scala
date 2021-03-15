@@ -1,16 +1,17 @@
 package com.github.utils4sn
 
-import slogging.LazyLogging
-
+import scala.collection.Seq
 import scala.scalanative.unsafe._
+import scala.scalanative.unsigned._
 
+import com.github.mzdb4s.Logging
 import com.github.sqlite4s.c.util._
 
 import bindings._
 
-object YxmlUtils extends LazyLogging {
+object YxmlUtils extends Logging {
 
-  private val YXML_BUFF_SIZE = 4096
+  private val YXML_BUFF_SIZE = 4096.toULong
 
   import YxmlLib._
   import enum_yxml_ret_t._
@@ -172,7 +173,7 @@ object YxmlUtils extends LazyLogging {
     int attr_value_ptr_max = -1;*/
 
     val nodeContentCStrBuilder = CStringBuilder.create()
-    val nodeContentAsStrWrapper = new CStringWrapper(c"", 0)
+    val nodeContentAsStrWrapper = new CStringWrapper(c"", 0.toULong)
 
     val nodeAttrs = new collection.mutable.ArrayBuffer[(String,String)]()
     val attrValueCStrBuilder = CStringBuilder.create()

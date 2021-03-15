@@ -24,6 +24,9 @@ class NativeMzDbWriter(
     this(new File(dbPath), metaData, bbSizes)
   }
 
+  override protected def formatDateToISO8601String(date: java.util.Date) : String = {
+    com.github.mzdb4s.util.date.DateParser.dateToIsoString(date)
+  }
 }
 
 /*

@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.bb2
+/*package com.github.mzdb4s.io.reader.bb2
 
 import com.github.mzdb4s.msdata.DataEncoding
 
@@ -40,3 +40,4 @@ private[reader] class BoundingBoxIndexFactory() {
   }
 
 }
+*/

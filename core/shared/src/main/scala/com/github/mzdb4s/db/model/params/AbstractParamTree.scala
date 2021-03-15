@@ -1,8 +1,6 @@
 package com.github.mzdb4s.db.model.params
 
-import java.util
-//import javax.xml.bind.annotation.XmlElement
-
+import scala.collection.Seq
 import scala.collection.mutable.ArrayBuffer
 
 import com.github.mzdb4s.db.model.params.param.CVParam
@@ -15,7 +13,8 @@ import com.github.mzdb4s.db.model.params.param.UserText
   *
   */
 //@XmlAccessorType(XmlAccessType.NONE)
-abstract class AbstractParamTree extends IParamContainer {
+abstract class AbstractParamTree extends Equals with IParamContainer {
+
   /** The cv params. */
   protected var cvParams: Seq[CVParam] = _
   /** The user params. */
@@ -24,6 +23,32 @@ abstract class AbstractParamTree extends IParamContainer {
     * The userText params: newly introduced for handling Thermo metadata in text field
     */
   protected var userTexts: Seq[UserText] = _
+
+  // See: https://stackoverflow.com/questions/7370925/what-is-the-standard-idiom-for-implementing-equals-and-hashcode-in-scala
+  override def canEqual(that: Any): Boolean = {
+    that.isInstanceOf[AbstractParamTree]
+  }
+
+  //Intentionally avoiding the call to super.equals because no ancestor has overridden equals (see note 7 below)
+  override def equals(that: Any): Boolean = {
+    that match {
+      case paramTree: AbstractParamTree =>
+        ( (this eq paramTree)                   // optional, but highly recommended sans very specific knowledge about this exact class implementation
+          || (paramTree.canEqual(this)    // optional only if this class is marked final
+          && hashCode == paramTree.hashCode     // optional, exceptionally execution efficient if hashCode is cached, at an obvious space inefficiency tradeoff
+          && cvParams == paramTree.cvParams && userParams == paramTree.userParams && userTexts == paramTree.userTexts
+          )
+          )
+      case _ =>
+        false
+    }
+  }
+
+  // Intentionally avoiding the call to super.hashCode because no ancestor has overridden hashCode
+  // See: https://stackoverflow.com/questions/9068154/what-is-the-difference-between-and-hashcode/60748297#60748297
+  override def hashCode(): Int = {
+    31 * cvParams.## + userParams.## + userTexts.## // notes: 31 is a prime number and null.## returns 0
+  }
 
   //@XmlElement(name = "cvParam", `type` = classOf[Nothing], required = false)
   //@XmlElementWrapper(name = "cvParams")
@@ -60,12 +85,22 @@ abstract class AbstractParamTree extends IParamContainer {
     userParams.find(_.getName == name).orNull
   }
 
-  def getCVParam(cvEntry: PsiMsCV.Term): CVParam = {
-    this.getCVParams().find(_.getAccession == cvEntry.getAccession).orNull
+  def getCVParam(cvTerm: PsiMsCV.Term): CVParam = {
+    this.getCVParams().find(_.getAccession == cvTerm.getAccession).orNull
+  }
+
+  def getCVParams(cvTerms: Array[PsiMsCV.Term]): Seq[CVParam] = {
+    val acSet = cvTerms.map(_.getAccession).toSet
+    this.getCVParams().filter(cv => acSet.contains(cv.getAccession))
   }
 
   def getCVParams(cvEntries: Array[CVParam]): Seq[CVParam] = {
     val acSet = cvEntries.map(_.getAccession).toSet
     this.getCVParams().filter(cv => acSet.contains(cv.getAccession))
   }
+
+  def toParamTree(): ParamTree = {
+    ParamTree(cvParams,userParams,userTexts)
+  }
+
 }

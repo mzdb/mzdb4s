@@ -4,9 +4,9 @@ import java.io.File
 import java.nio.ByteBuffer
 
 import com.github.mzdb4s.db.model.MzDbMetaData
+import com.github.mzdb4s.io.writer.{BoundingBox => WriterBB}
 import com.github.mzdb4s.msdata._
 import com.github.sqlite4s._
-//import com.github.mzdb4s.util.primitive.PrimitivesToBytes
 
 class MzDbWriter(
   val dbLocation: File,
@@ -19,7 +19,11 @@ class MzDbWriter(
     this(new File(dbPath), metaData, bbSizes)
   }
 
-  protected def insertBoundingBox(bb: BoundingBox): Long = { // --- INSERT BOUNDING BOX --- //
+  protected def formatDateToISO8601String(date: java.util.Date) : String = {
+    com.github.mzdb4s.util.date.DateParser.dateToIsoString(date)
+  }
+
+  protected def insertBoundingBox(bb: WriterBB): Long = { // --- INSERT BOUNDING BOX --- //
 
     val spectrumIds = bb.spectrumIds
     val spectrumSlices = bb.spectrumSlices

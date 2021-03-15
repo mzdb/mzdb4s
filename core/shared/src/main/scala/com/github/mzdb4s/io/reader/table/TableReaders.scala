@@ -1,11 +1,16 @@
 package com.github.mzdb4s.io.reader.table
 
+import scala.collection.Seq
+
 import com.github.mzdb4s.db.model._
 import com.github.mzdb4s.db.table._
 import com.github.mzdb4s.io.MzDbContext
-import com.github.mzdb4s.io.reader.param.ParamTreeParser
-
+import com.github.mzdb4s.io.reader.param.IParamTreeParser
 import com.github.sqlite4s.query.SQLiteRecord
+
+object ParamTreeParser {
+  val instance: IParamTreeParser = com.github.mzdb4s.io.reader.param.ParamTreeParser
+}
 
 class InstrumentConfigReader()(implicit val mzDbContext: MzDbContext) extends AbstractTableModelReader[InstrumentConfiguration] {
 
@@ -16,8 +21,8 @@ class InstrumentConfigReader()(implicit val mzDbContext: MzDbContext) extends Ab
     val paramTreeAsStr = r.columnString(InstrumentConfigurationTable.PARAM_TREE)
     val insConfAsStr = r.columnString(InstrumentConfigurationTable.COMPONENT_LIST)
 
-    val paramTree = if (paramTreeAsStr == null) null else ParamTreeParser.parseParamTree(paramTreeAsStr)
-    InstrumentConfiguration(id, name, softwareId, paramTree, ParamTreeParser.parseComponentList(insConfAsStr))
+    val paramTree = if (paramTreeAsStr == null) null else ParamTreeParser.instance.parseParamTree(paramTreeAsStr)
+    InstrumentConfiguration(id, name, Some(softwareId), paramTree, ParamTreeParser.instance.parseComponentList(insConfAsStr))
   }
 
   def getInstrumentConfig(id: Int): InstrumentConfiguration = getRecord(InstrumentConfiguration.TABLE_NAME, id)
@@ -30,9 +35,14 @@ class MzDbHeaderReader()(implicit val mzDbContext: MzDbContext) extends Abstract
   def extractRecord(r: SQLiteRecord): MzDbHeader = {
     val version = r.columnString(MzdbTable.VERSION)
     val creationTimestamp = r.columnInt(MzdbTable.CREATION_TIMESTAMP)
+    val fileContentAsStr = r.columnString(MzdbTable.FILE_CONTENT)
     val paramTreeAsStr = r.columnString(MzdbTable.PARAM_TREE)
-    val paramTree = ParamTreeParser.parseParamTree(paramTreeAsStr)
-    MzDbHeader(version, creationTimestamp, paramTree)
+
+    val fileContent = ParamTreeParser.instance.parseFileContent(fileContentAsStr)
+
+    val paramTree = ParamTreeParser.instance.parseParamTree(paramTreeAsStr)
+
+    MzDbHeader(version, creationTimestamp, fileContent, paramTree)
   }
 
   def getMzDbHeader(): MzDbHeader = {
@@ -68,7 +78,15 @@ class RunReader()(implicit val mzDbContext: MzDbContext) extends AbstractTableMo
 
     val paramTreeAsStr = r.columnString(RunTable.PARAM_TREE)
 
-    Run(id, name, startTimestamp, ParamTreeParser.parseParamTree(paramTreeAsStr))
+    Run(
+      id,
+      name,
+      startTimestamp,
+      ParamTreeParser.instance.parseParamTree(paramTreeAsStr),
+      instrumentConfigId = Some(r.columnInt(RunTable.DEFAULT_INSTRUMENT_CONFIG_ID)),
+      sampleId = Some(r.columnInt(RunTable.SAMPLE_ID)),
+      sourceFileId = if (r.columnNull(RunTable.DEFAULT_SOURCE_FILE_ID)) None else Some(r.columnInt(RunTable.DEFAULT_SOURCE_FILE_ID))
+    )
   }
 
   def getRun(id: Int): Run = getRecord(Run.TABLE_NAME, id)
@@ -83,7 +101,7 @@ class SampleReader()(implicit val mzDbContext: MzDbContext) extends AbstractTabl
     val id = r.columnInt(SampleTable.ID)
     val name = r.columnString(SampleTable.NAME)
     val paramTreeAsStr = r.columnString(SampleTable.PARAM_TREE)
-    Sample(id, name, ParamTreeParser.parseParamTree(paramTreeAsStr))
+    Sample(id, name, ParamTreeParser.instance.parseParamTree(paramTreeAsStr))
   }
 
   def getSample(id: Int): Sample = getRecord(Sample.TABLE_NAME, id)
@@ -98,7 +116,7 @@ class SoftwareReader()(implicit val mzDbContext: MzDbContext) extends AbstractTa
     val name = r.columnString(SoftwareTable.NAME)
     val version = r.columnString(SoftwareTable.VERSION)
     val paramTreeAsStr = r.columnString(SoftwareTable.PARAM_TREE)
-    Software(id, name, version, ParamTreeParser.parseParamTree(paramTreeAsStr))
+    Software(id, name, version, ParamTreeParser.instance.parseParamTree(paramTreeAsStr))
   }
 
   def getSoftware(id: Int): Software = getRecord(Software.TABLE_NAME, id)
@@ -113,7 +131,10 @@ class SourceFileReader()(implicit val mzDbContext: MzDbContext) extends Abstract
     val name = r.columnString(SourceFileTable.NAME)
     val location = r.columnString(SourceFileTable.LOCATION)
     val paramTreeAsStr = r.columnString(SourceFileTable.PARAM_TREE)
-    SourceFile(id, name, location, ParamTreeParser.parseParamTree(paramTreeAsStr))
+    val paramTree = if (paramTreeAsStr == null || paramTreeAsStr.isEmpty) null
+    else ParamTreeParser.instance.parseParamTree(paramTreeAsStr)
+
+    SourceFile(id, name, location, paramTree)
   }
 
   def getSourceFile(id: Int): SourceFile = getRecord(SourceFile.TABLE_NAME, id)

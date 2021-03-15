@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.bb2
+/*package com.github.mzdb4s.io.reader.bb2
 
 import scala.collection.mutable.Buffer
 import scala.collection.mutable.WrappedArray
@@ -56,3 +56,4 @@ trait IBoundingBoxReader {
 trait IByteBufferAsInts extends Any {
   def apply(bytesIndex: Int)(implicit bbIdxFactory: BoundingBoxIndexFactory): Int
 }
+*/

@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.iterator2
+/*package com.github.mzdb4s.io.reader.iterator2
 
 import com.github.mzdb4s.io.MzDbContext
 
@@ -144,4 +144,4 @@ class BoundingBoxIterator protected(override val statement: ISQLiteStatement)(im
 
     bbReader
   }
-}
+}*/

@@ -83,6 +83,21 @@ class BoundingBoxIterator protected(override val statement: ISQLiteStatement) ex
     val firstSpectrumId = stmt.columnInt(3)
     val lastSpectrumId = stmt.columnInt(4)
 
+    /*
+    val startTime = System.currentTimeMillis
+    var i = 0
+
+    while (i < 10000) {
+      i += 1
+      val bb = BoundingBoxBuilder.buildBB(
+        bbId, bbBytes, firstSpectrumId, lastSpectrumId, this.spectrumHeaderById, this.dataEncodingBySpectrumId
+      )
+    }
+
+    val took = System.currentTimeMillis - startTime
+    println("BoundingBoxBuilder took : " + took)
+     */
+
     val bb = BoundingBoxBuilder.buildBB(
       bbId, bbBytes, firstSpectrumId, lastSpectrumId, this.spectrumHeaderById, this.dataEncodingBySpectrumId
     )

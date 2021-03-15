@@ -3,6 +3,7 @@ package com.github.mzdb4s.msdata
 import java.util
 
 import scala.beans.BeanProperty
+import scala.collection.Seq
 import com.github.mzdb4s.util.ms.MsUtils
 
 import scala.collection.mutable.WrappedArray
@@ -22,10 +23,10 @@ trait ISpectrumDataContainer extends Any {
 
 trait ISpectrumData extends ISpectrumDataContainer {
   // Methods to be implemented
-  def mzList: Seq[Double]
-  def intensityList: Seq[Float]
-  def leftHwhmList: Seq[Float]
-  def rightHwhmList: Seq[Float]
+  def mzList: Array[Double]
+  def intensityList: Array[Float]
+  def leftHwhmList: Array[Float]
+  def rightHwhmList: Array[Float]
   def peaksCount: Int
   //def toPeaks[T <: IPeak](lcContext: ILcContext): Array[T]
   def toPeaks(lcContext: ILcContext): Array[IPeak]
@@ -72,11 +73,20 @@ abstract class AbstractSpectrumData extends ISpectrumData {
 
 }
 
+/*
 case class SpectrumData(
   @BeanProperty mzList: WrappedArray[Double],
   @BeanProperty intensityList: WrappedArray[Float],
   @BeanProperty leftHwhmList: WrappedArray[Float],
   @BeanProperty rightHwhmList: WrappedArray[Float]
+) extends AbstractSpectrumData {
+ */
+
+case class SpectrumData(
+  @BeanProperty mzList: Array[Double],
+  @BeanProperty intensityList: Array[Float],
+  @BeanProperty leftHwhmList: Array[Float],
+  @BeanProperty rightHwhmList: Array[Float]
 ) extends AbstractSpectrumData {
   require(mzList != null, "mzList is null")
   require(intensityList != null, "intensityList is null")
@@ -115,16 +125,16 @@ case class SpectrumData(
   def toPeaks(lcContext: ILcContext): Array[IPeak] = {
     val peaks = new Array[IPeak](peaksCount)
 
-    val mzArray = mzList.array
-    val intensityArray = intensityList.array
-    lazy val leftHwhmArray = leftHwhmList.array
-    lazy val rightHwhmArray = rightHwhmList.array
+    val mzArray = mzList
+    val intensityArray = intensityList
+    val leftHwhmArray = leftHwhmList
+    val rightHwhmArray = rightHwhmList
 
     var i = 0
     while (i < peaksCount) {
       var leftHwhm = 0f
       var rightHwhm = 0f
-      if (leftHwhmList != null && rightHwhmList != null) {
+      if (leftHwhmArray != null && rightHwhmArray != null) {
         leftHwhm = leftHwhmArray(i)
         rightHwhm = rightHwhmArray(i)
       }
@@ -166,7 +176,7 @@ case class SpectrumData(
   def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): IPeak = {
     if (peaksCount == 0) return null
 
-    val myMzList = this.mzList.array
+    val myMzList = this.mzList
     val mzDa = MsUtils.ppmToDa(mz, mzTolPPM)
     val binSearchIndex = util.Arrays.binarySearch(myMzList, mz)
     /*if (binSearchIndex >= 0) {
@@ -206,17 +216,17 @@ case class SpectrumData(
     }
 
     if (leftHwhmList != null && rightHwhmList != null) {
-      Peak(myMzList(newIdx), this.intensityList.array(newIdx), this.leftHwhmList.array(newIdx), this.rightHwhmList.array(newIdx), lcContext)
+      Peak(myMzList(newIdx), this.intensityList(newIdx), this.leftHwhmList(newIdx), this.rightHwhmList(newIdx), lcContext)
     }
     else {
-      val peak = new Peak(myMzList(newIdx), this.intensityList.array(newIdx))
+      val peak = new Peak(myMzList(newIdx), this.intensityList(newIdx))
       peak.setLcContext(lcContext)
       peak
     }
   }
 
   def getNearestPeakIndex(value: Double): Int = {
-    val myMzList = this.mzList.array
+    val myMzList = this.mzList
     var idx = util.Arrays.binarySearch(myMzList, value)
     idx = if (idx < 0) ~idx else idx
 
@@ -234,7 +244,7 @@ case class SpectrumData(
   }
 
   def getPeakIndex(value: Double, ppmTol: Double): Int = {
-    val myMzList = this.mzList.array
+    val myMzList = this.mzList
     var idx = util.Arrays.binarySearch(myMzList, value)
     idx = if (idx < 0) ~idx else idx
 
@@ -256,7 +266,7 @@ case class SpectrumData(
     require(minMz <= maxMz, "maxMz can be lower than minMz")
 
     val nbPoints = peaksCount
-    val myMzList = this.mzList.array
+    val myMzList = this.mzList
 
     // Retrieve the index of nearest minimum value if it exists
     val minBinSearchIndex = util.Arrays.binarySearch(myMzList, minMz)
@@ -275,14 +285,14 @@ case class SpectrumData(
     val filteredSpectrumData = if (this.leftHwhmList == null || this.rightHwhmList == null) {
       new SpectrumData(
         util.Arrays.copyOfRange(myMzList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.intensityList.array, firstIdx, lastIdx)
+        util.Arrays.copyOfRange(this.intensityList, firstIdx, lastIdx)
       )
     } else {
       new SpectrumData(
         util.Arrays.copyOfRange(myMzList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.intensityList.array, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.leftHwhmList.array, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.rightHwhmList.array, firstIdx, lastIdx)
+        util.Arrays.copyOfRange(this.intensityList, firstIdx, lastIdx),
+        util.Arrays.copyOfRange(this.leftHwhmList, firstIdx, lastIdx),
+        util.Arrays.copyOfRange(this.rightHwhmList, firstIdx, lastIdx)
       )
     }
 

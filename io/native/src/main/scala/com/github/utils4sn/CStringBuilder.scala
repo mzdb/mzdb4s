@@ -7,16 +7,16 @@ import bindings.StrBuilderLib._
 
 class CStringBuilderInstance(val sb: Ptr[StrBuilderLib.str_builder_t]) extends AnyVal {
 
-  def addString(string: CString, length: CSize): Unit = str_builder_add_str(sb, string, length)
-  def addChar(c: CChar): Unit = str_builder_add_char(sb, c)
-  def addInt(value: CInt): Unit = str_builder_add_int(sb, value)
+  def addString(string: CString, length: CSize): CStringBuilderInstance = { str_builder_add_str(sb, string, length); this }
+  def addChar(c: CChar): CStringBuilderInstance = { str_builder_add_char(sb, c); this }
+  def addInt(value: CInt): CStringBuilderInstance = { str_builder_add_int(sb, value); this }
 
-  def clear(): Unit = str_builder_clear(sb)
+  def clear(): CStringBuilderInstance = { str_builder_clear(sb); this }
   def destroy(): Unit = str_builder_destroy(sb)
 
   def length(): CSize = str_builder_len(sb)
-  def drop(length: CSize): Unit = str_builder_drop(sb, length)
-  def truncate(length: CSize): Unit = str_builder_truncate(sb, length)
+  def drop(length: CSize): CStringBuilderInstance = { str_builder_drop(sb, length); this }
+  def truncate(length: CSize): CStringBuilderInstance = { str_builder_truncate(sb, length); this }
 
   def underlyingString(): CString = str_builder_peek(sb)
   def copyString(strLenPtr: Ptr[CSize]): CString = str_builder_dump(sb, strLenPtr)

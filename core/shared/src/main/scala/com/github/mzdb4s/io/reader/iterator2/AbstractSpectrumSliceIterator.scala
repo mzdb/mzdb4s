@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.iterator2
+/*package com.github.mzdb4s.io.reader.iterator2
 
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.io.reader.bb2.IBoundingBoxReader
@@ -58,4 +58,4 @@ abstract class AbstractSpectrumSliceIterator protected (val boundingBoxIterator:
   }
 
   //def remove(): Unit = throw new UnsupportedOperationException("remove operation is not supported")
-}
+}*/

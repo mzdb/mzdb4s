@@ -1,5 +1,7 @@
 package com.github.mzdb4s.io.serialization
 
+import scala.collection.Seq
+
 import com.github.mzdb4s.db.model.params._
 import com.github.mzdb4s.db.model.params.param._
 
@@ -80,11 +82,35 @@ object XmlSerializer {
       |""".stripMargin*/
   }
 
+  def serializeFileContent(fileContent: FileContent): String = {
+    if (fileContent == null) return null
+
+    val strBuilder = new StringBuilder()
+    strBuilder ++= s"<fileContent>\n"
+
+    this._addCvParamsToStrBuilder(fileContent.getCVParams(), strBuilder)
+    this._addUserParamsToStrBuilder(fileContent.getUserParams(), strBuilder)
+
+    strBuilder ++= "</fileContent>"
+
+    strBuilder.toString()
+  }
+
   private def _addCvParamsToStrBuilder(cvParams: Seq[CVParam], strBuilder: StringBuilder): StringBuilder = {
     if (cvParams.nonEmpty) {
       strBuilder ++= "  <cvParams>\n"
       _addXmlParamsToStrBuilder(cvParams, strBuilder)
       strBuilder ++= "  </cvParams>\n"
+    }
+
+    strBuilder
+  }
+
+  private def _addUserParamsToStrBuilder(userParams: Seq[UserParam], strBuilder: StringBuilder): StringBuilder = {
+    if (userParams.nonEmpty) {
+      strBuilder ++= "  <userParams>\n"
+      _addXmlParamsToStrBuilder(userParams, strBuilder)
+      strBuilder ++= "  </userParams>\n"
     }
 
     strBuilder

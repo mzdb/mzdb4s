@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.iterator2
+/*package com.github.mzdb4s.io.reader.iterator2
 
 import java.util.Comparator
 import java.util.PriorityQueue
@@ -218,4 +218,4 @@ class SpectrumIterator protected (
     ()
   }*/
 
-}
+}*/

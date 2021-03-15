@@ -1,11 +1,14 @@
 package com.github.mzdb4s.io.mzml
 
 import scala.beans.BeanProperty
+import scala.collection.Seq
 
 import com.github.mzdb4s.db.model._
+import com.github.mzdb4s.db.model.params.FileContent
 import com.github.mzdb4s.msdata.DataEncoding
 
 case class MzMLMetaData(
+  @BeanProperty fileContent: FileContent,
   @BeanProperty commonInstrumentParams: CommonInstrumentParams,
   @BeanProperty instrumentConfigurations: Seq[InstrumentConfiguration],
   @BeanProperty processingMethods: Seq[ProcessingMethod],

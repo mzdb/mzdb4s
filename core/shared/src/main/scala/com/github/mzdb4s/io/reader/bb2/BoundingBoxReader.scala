@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.bb2
+/*package com.github.mzdb4s.io.reader.bb2
 
 import com.github.mzdb4s.msdata._
 import com.github.sqlite4s._
@@ -40,4 +40,4 @@ object BoundingBoxReader {
     new BoundingBoxBlobReader(bbId, blob, runSliceId, firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId)
   }
 
-}
+}*/

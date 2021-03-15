@@ -1,7 +1,8 @@
 package com.github.mzdb4s.msdata.builder
 
+import scala.collection.Seq
 import com.github.mzdb4s.msdata._
-import com.github.mzdb4s.util.collection.ResizedArray
+//import com.github.mzdb4s.util.collection.ResizedArray
 
 trait ISpectrumDataAdder {
 
@@ -74,8 +75,8 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
 
   private var _index = 0
 
-  private var _mzList = new Array[Double](dataPointsCount)
-  private var _intensityList = new Array[Float](dataPointsCount)
+  private val _mzList = new Array[Double](dataPointsCount)
+  private val _intensityList = new Array[Float](dataPointsCount)
   private var _leftHwhmList: Array[Float] = _
   private var _rightHwhmList: Array[Float] = _
 
@@ -112,7 +113,7 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
     rightHwhmList: Seq[Float]
   ): this.type = {
 
-    var nDataPoints = mzList.length
+    val nDataPoints = mzList.length
 
     var i = 0
     if (leftHwhmList != null && rightHwhmList != null) {
@@ -147,12 +148,11 @@ class SpectrumDataBuilder(var dataPointsCount: Int) extends AbstractSpectrumData
     val sd = if (_index == dataPointsCount) {
       SpectrumData(_mzList, _intensityList, _leftHwhmList, _rightHwhmList)
     } else {
-
       SpectrumData(
-        new ResizedArray.ofDouble(_mzList, _index),
-        new ResizedArray.ofFloat(_intensityList, _index),
-        if (_leftHwhmList == null) null else new ResizedArray.ofFloat(_leftHwhmList, _index),
-        if (_rightHwhmList == null) null else new ResizedArray.ofFloat(_rightHwhmList, _index)
+        java.util.Arrays.copyOf(_mzList, _index),
+        java.util.Arrays.copyOf(_intensityList, _index),
+        if (_leftHwhmList == null) null else java.util.Arrays.copyOf(_leftHwhmList, _index),
+        if (_rightHwhmList == null) null else java.util.Arrays.copyOf(_rightHwhmList, _index)
       )
     }
 

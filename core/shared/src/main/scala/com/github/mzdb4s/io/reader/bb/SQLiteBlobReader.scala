@@ -1,6 +1,5 @@
 package com.github.mzdb4s.io.reader.bb
 
-import java.nio.ByteBuffer
 import java.util
 
 import scala.collection.mutable.LongMap
@@ -84,16 +83,16 @@ class SQLiteBlobReader(
   }
 
   private def _getIntFromBlob(blob: ISQLiteBlob, idx: Int): Int = {
-    val byteBuffer = new Array[Byte](4)
+    val byteArray = new Array[Byte](4)
 
     // read 4 bytes
-    try blob.read(idx, byteBuffer, 0, 4)
+    try blob.read(idx, byteArray, 0, 4)
     catch {
       case e: Exception =>
         throw new Exception("can't read bytes from the SQLite blob", e)
     }
 
-    BytesUtils.bytesToInt(byteBuffer, 0)
+    BytesUtils.bytesToInt(byteArray, 0)
   }
 
   override def readSpectrumSliceAt(idx: Int): SpectrumSlice = {
@@ -132,6 +131,6 @@ class SQLiteBlobReader(
     }
 
     // Instantiate a new SpectrumData for the corresponding spectrum slice
-    this.readSpectrumSliceData(ByteBuffer.wrap(peaksBytes), spectrumSliceStartPos, peaksBytesSize, de, minMz, maxMz)
+    this.readSpectrumSliceData(ByteArrayWrapper(peaksBytes, de.byteOrder), spectrumSliceStartPos, peaksBytesSize, de, minMz, maxMz)
   }
 }

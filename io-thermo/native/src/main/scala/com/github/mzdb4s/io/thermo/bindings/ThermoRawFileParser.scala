@@ -558,6 +558,8 @@ object ThermoRawFileParser {
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_new(rawFileWrapper: Ptr[ThermoRawFileParser_RawFileWrapper]): Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter] = extern
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_getSpectrumWrapper(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter]): Ptr[ThermoRawFileParser_Writer_SpectrumWrapper] = extern
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_GetInMemoryStreamAsString(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter]): CString = extern
+  def ThermoRawFileParser_Writer_MzMlSpectrumWriter_FlushWriterThenGetXmlStreamLength(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter]): int32_t = extern
+  def ThermoRawFileParser_Writer_MzMlSpectrumWriter_CopyXmlStreamToPointers(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter], ptrAddress: int64_t): Unit = extern
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_ResetWriter(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter], callGC: CBool): Unit = extern
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_Write(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter], firstScanNumber: int32_t, lastScanNumber: int32_t): Unit = extern
   def ThermoRawFileParser_Writer_MzMlSpectrumWriter_CreateXmlWriter(objectPtr: Ptr[ThermoRawFileParser_Writer_MzMlSpectrumWriter]): Unit = extern

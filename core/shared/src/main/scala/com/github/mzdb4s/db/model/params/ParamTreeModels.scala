@@ -1,9 +1,8 @@
 package com.github.mzdb4s.db.model.params
 
+import scala.collection.Seq
 import param._
 import thermo._
-
-//import javax.xml.bind.annotation._
 
 //@XmlRootElement(name = "activation")
 class Activation() extends AbstractParamTree
@@ -16,6 +15,31 @@ class Component(
   var order: Int = 0
 ) extends AbstractParamTree {
   def getOrder(): Int = order
+
+  // See: https://stackoverflow.com/questions/7370925/what-is-the-standard-idiom-for-implementing-equals-and-hashcode-in-scala
+  override def canEqual(that: Any): Boolean = {
+    that.isInstanceOf[Component]
+  }
+
+  override def equals(that: Any): Boolean = {
+    super.equals(that) && {
+      that match {
+        case comp: Component =>
+          ((this eq comp) // optional, but highly recommended sans very specific knowledge about this exact class implementation
+            || (comp.canEqual(this) // optional only if this class is marked final
+            && hashCode == comp.hashCode // optional, exceptionally execution efficient if hashCode is cached, at an obvious space inefficiency tradeoff
+            && order == comp.order
+            ))
+        case _ =>
+          false
+      }
+    }
+  }
+
+  // See: https://stackoverflow.com/questions/9068154/what-is-the-difference-between-and-hashcode/60748297#60748297
+  override def hashCode(): Int = {
+    31 * super.hashCode() + order.##
+  }
 }
 
 //@XmlRootElement(name = "componentList")
@@ -32,6 +56,15 @@ class ComponentList(
 
 //@XmlType(name = "DetectorComponent")
 class DetectorComponent(order: Int) extends Component(order) {}
+
+case class FileContent() extends AbstractParamTree {
+  def this(paramTree: ParamTree) = {
+    this()
+
+    this.setCVParams(paramTree.getCVParams())
+    this.setUserParams(paramTree.getUserParams())
+  }
+}
 
 //@XmlRootElement(name = "isolationWindow")
 class IsolationWindowParamTree() extends AbstractParamTree
@@ -50,23 +83,26 @@ object ParamTree {
     paramTree
   }
 }
-class ParamTree() extends AbstractParamTree
+
+private case class PrintableParamTree(cvParams: Seq[CVParam], userParams: Seq[UserParam], userTexts: Seq[UserText])
+
+class ParamTree() extends AbstractParamTree with Equals {
+
+  override def toString() = {
+    PrintableParamTree(cvParams, userParams, userTexts).toString.replaceAllLiterally("PrintableParamTree","ParamTree")
+  }
+}
 
 //@XmlRootElement(name = "precursor")
-class Precursor {
+class Precursor(spectrumRef: String) extends AbstractParamTree {
   //@XmlAttribute(required = true)
-  protected var spectrumRef: String = _
+  //protected var spectrumRef: String = _
   //@XmlElement(name = "isolationWindow")
   protected var isolationWindow: IsolationWindowParamTree = _
   //@XmlElement(name = "selectedIonList")
   protected var selectedIonList: SelectedIonList = _
   //@XmlElement(name = "activation")
   protected var activation: Activation = _
-
-  def getSpectrumRef(): String = spectrumRef
-  def setSpectrumRef(spectrumRef: String): Unit = {
-    this.spectrumRef = spectrumRef
-  }
 
   def getIsolationWindow(): IsolationWindowParamTree = isolationWindow
   def setIsolationWindow(isolationWindow: IsolationWindowParamTree): Unit = {
@@ -83,10 +119,9 @@ class Precursor {
     this.selectedIonList = selectedIonList
   }
 
-  def parseFirstSelectedIonMz(): Double = {
-    val ion = this.getSelectedIonList().getSelectedIons().head
-    val precMzAsStr = ion.getCVParam(PsiMsCV.SELECTED_ION_MZ).getValue
-    precMzAsStr.toDouble
+  def parseFirstSelectedIonMz(): Option[Double] = {
+    val ionOpt = this.getSelectedIonList().getSelectedIons().headOption
+    ionOpt.map(_.getCVParam(PsiMsCV.SELECTED_ION_MZ).getValue.toDouble)
   }
 }
 
@@ -141,6 +176,7 @@ class ScanWindowList private() extends AbstractParamTree {
     this.count = c
   }
 
+  def getScanWindows(): Seq[ScanWindow] = scanWindows
   def setScanWindows(scanWindows: Seq[ScanWindow]): Unit = {
     this.scanWindows = scanWindows
   }
@@ -161,6 +197,9 @@ class SelectedIonList private() extends AbstractParamTree {
   }
 
   def getSelectedIons(): Seq[SelectedIon] = selectedIons
+  def setSelectedIons(selectedIons:  Seq[SelectedIon]): Unit = {
+    this.selectedIons = selectedIons
+  }
 }
 
 //@XmlType(name = "SourceComponent")

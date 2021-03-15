@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.bb2
+/*package com.github.mzdb4s.io.reader.bb2
 
 import java.nio.ByteBuffer
 
@@ -95,4 +95,4 @@ private[this] final class ByteBufferAsInts(
   }
 }
 
-
+*/

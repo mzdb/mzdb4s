@@ -2,6 +2,7 @@ package com.github.mzdb4s
 
 import java.io.File
 
+import scala.collection.Seq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import com.github.mzdb4s.db.model._
@@ -118,7 +119,7 @@ abstract class AbstractMzDbReader {
     val spectraCount = MzDbReaderQueries.getSpectraCount()
 
     val sqlString = "SELECT id, param_tree, scan_list, precursor_list, product_list FROM spectrum"
-    val records = mzDbCtx.newSQLiteQuery(sqlString)getRecordIterator()
+    val records = mzDbCtx.newSQLiteQuery(sqlString).getRecordIterator()
 
     val xmlMetaDataBuffer = new ArrayBuffer[SpectrumXmlMetaData](spectraCount)
     while (records.hasNext) {

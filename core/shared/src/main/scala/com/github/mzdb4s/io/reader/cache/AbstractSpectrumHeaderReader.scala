@@ -4,7 +4,6 @@ import scala.collection.mutable.{ArrayBuffer, LongMap}
 import com.github.mzdb4s.AbstractMzDbReader
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.io.reader.MzDbReaderQueries
-import com.github.mzdb4s.io.reader.param.ParamTreeParser
 import com.github.mzdb4s.msdata.{ActivationType, PeakEncoding, SpectrumHeader}
 import com.github.sqlite4s.ISQLiteRecordExtraction
 import com.github.sqlite4s.query.SQLiteRecord
@@ -92,6 +91,8 @@ abstract class AbstractSpectrumHeaderReader(
   private def _getSpectrumHeaderExtractor()(implicit mzDbCtx: MzDbContext): ISQLiteRecordExtraction[SpectrumHeader] = {
     if (_spectrumHeaderExtractor != null) return _spectrumHeaderExtractor
 
+    val paramTreeParser = mzDbCtx.paramTreeParser
+
     _spectrumHeaderExtractor = new Object() with ISQLiteRecordExtraction[SpectrumHeader] {
       def extractRecord(record: SQLiteRecord): SpectrumHeader = {
         val stmt = record.getStatement
@@ -133,13 +134,13 @@ abstract class AbstractSpectrumHeaderReader(
         )
 
         if (mzDbReader.isParamTreeLoadingEnabled)
-          sh.setParamTree(ParamTreeParser.parseParamTree(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.paramTree)))
+          sh.setParamTree(paramTreeParser.parseParamTree(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.paramTree)))
 
         if (mzDbReader.isScanListLoadingEnabled)
-          sh.setScanList(ParamTreeParser.parseScanList(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.scanList)))
+          sh.setScanList(paramTreeParser.parseScanList(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.scanList)))
 
         if (mzDbReader.isPrecursorListLoadingEnabled && msLevel >= 2)
-          sh.setPrecursor(ParamTreeParser.parsePrecursor(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.precursorList)))
+          sh.setPrecursor(paramTreeParser.parsePrecursors(stmt.columnString(AbstractSpectrumHeaderReader.SpectrumHeaderColIdx.precursorList)).headOption.orNull)
 
         sh
       }

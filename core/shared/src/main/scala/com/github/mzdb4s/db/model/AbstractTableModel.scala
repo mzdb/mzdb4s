@@ -1,18 +1,14 @@
 package com.github.mzdb4s.db.model
 
-//import java.util
-//import com.almworks.sqlite4java.SQLiteConnection
-//import com.almworks.sqlite4java.SQLiteException
+import scala.collection.Seq
 
-//import fr.profi.mzdb.io.reader.table.ParamTreeParser
-import com.github.mzdb4s.util.atomic.InMemoryIdGen
 import com.github.mzdb4s.io.MzDbContext
 import params._
 import param._
 
 abstract class AbstractTableModel[IdType] protected(
   protected var _paramTree: ParamTree
-) extends IParamContainer with InMemoryIdGen {
+) extends IParamContainer { // with InMemoryIdGen
 
   //type IdType = Int
   def id: IdType

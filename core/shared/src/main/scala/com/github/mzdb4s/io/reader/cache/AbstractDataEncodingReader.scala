@@ -2,12 +2,12 @@ package com.github.mzdb4s.io.reader.cache
 
 import java.nio.ByteOrder
 
+import scala.collection.Seq
 import scala.collection.mutable.LongMap
 
 import com.github.mzdb4s.db.table.{DataEncodingTable, SpectrumTable}
 import com.github.mzdb4s.io.MzDbContext
 import com.github.mzdb4s.io.reader.MzDbReaderQueries
-import com.github.mzdb4s.io.reader.param.ParamTreeParser
 import com.github.mzdb4s.msdata._
 import com.github.sqlite4s.ISQLiteRecordExtraction
 import com.github.sqlite4s.query.SQLiteRecord
@@ -38,7 +38,7 @@ object AbstractDataEncodingReader {
 
 abstract class AbstractDataEncodingReader(val entityCache: Option[MzDbEntityCache]) extends IMzDbEntityCacheContainer {
 
-  private var _dataEncodingExtractor: ISQLiteRecordExtraction[DataEncoding] = null
+  private var _dataEncodingExtractor: ISQLiteRecordExtraction[DataEncoding] = _
 
   private def _getOrCreateDataEncodingExtractor()(implicit mzDbCtx: MzDbContext): ISQLiteRecordExtraction[DataEncoding] = {
     if (_dataEncodingExtractor != null) return _dataEncodingExtractor
@@ -61,7 +61,7 @@ abstract class AbstractDataEncodingReader(val entityCache: Option[MzDbEntityCach
           {
             // Parse param tree
             val paramTreeAsStr = record.columnString(SpectrumTable.PARAM_TREE)
-            val paramTree = ParamTreeParser.parseParamTree(paramTreeAsStr)
+            val paramTree = mzDbCtx.paramTreeParser.parseParamTree(paramTreeAsStr)
             // NOTE: the two CV params may have the same AC => it could be conflicting...
             // It has been in fixed in version 0.9.8 of pwiz-mzdb
             val cvParams = paramTree.getCVParams()

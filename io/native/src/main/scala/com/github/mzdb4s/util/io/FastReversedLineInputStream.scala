@@ -17,7 +17,6 @@ object FastReversedLineInputStream {
 
 }
 
-@throws[IOException]
 class FastReversedLineInputStream(
   val file: File,
   var bufferSize: Int,
@@ -55,7 +54,7 @@ class FastReversedLineInputStream(
      //if (in.readByte == 0xA) currentFilePos -= 1
 
      currentLine = new Array[Byte](maxLineBytes)
-     currentLine(0) = 0xA toByte
+     currentLine(0) = 0xA.toByte
 
      this.bufferSize = getAdaptedSize(file.length, bufferSize)
      buffer = new Array[Byte](bufferSize)

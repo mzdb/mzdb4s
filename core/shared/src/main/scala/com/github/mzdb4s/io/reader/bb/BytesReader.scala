@@ -1,6 +1,5 @@
 package com.github.mzdb4s.io.reader.bb
 
-import java.nio.ByteBuffer
 import java.util
 
 import scala.collection.mutable.LongMap
@@ -8,8 +7,8 @@ import scala.collection.mutable.LongMap
 import com.github.mzdb4s.msdata._
 
 /**
-  * @author marco This implementation is mainly used is mzDbReader
-  * <p>Use a ByteBuffer to store the blob's bytes This class extends AbstractBlobReader.</p>
+  * @author David Bouyssie This implementation is mainly used is mzDbReader
+  * <p>Use a Byte Array to store the blob's bytes This class extends AbstractBlobReader.</p>
   */
 class BytesReader(
   private val bytes: Array[Byte],
@@ -19,8 +18,8 @@ class BytesReader(
 ) extends AbstractBlobReader {
 
   //extends AbstractBlobReader(firstSpectrumId, lastSpectrumId, spectrumHeaderById, dataEncodingBySpectrumId) {
-  private val _firstDataEnconding: DataEncoding = dataEncodingBySpectrumId.valuesIterator.next
-  private val _bbByteBuffer = ByteBuffer.wrap(bytes).order(_firstDataEnconding.byteOrder)
+  private val _firstDataEncoding: DataEncoding = dataEncodingBySpectrumId.valuesIterator.next
+  private val _bbByteArrayWrapper: IByteArrayWrapper = ByteArrayWrapper(bytes, _firstDataEncoding.byteOrder)
   private val _blobSize = bytes.length
   //logger.debug("BytesReader: blobSize="+ _blobSize);
 
@@ -33,17 +32,17 @@ class BytesReader(
 
     var spectrumSliceIdx = 0
     var byteIdx = 0
-    while (byteIdx < _blobSize) { // Set the new position to access the byte buffer
+    while (byteIdx < _blobSize) { // Set the new position to access the byte array
       //println(byteIdx)
-      _bbByteBuffer.position(byteIdx)
+      _bbByteArrayWrapper.position(byteIdx)
 
       // Retrieve the spectrum id
-      val spectrumId = _bbByteBuffer.getInt.toLong
+      val spectrumId = _bbByteArrayWrapper.getInt().toLong
       //println("spectrumId",spectrumId)
       spectrumSliceStartPositions(spectrumSliceIdx) = byteIdx
 
       // Retrieve the number of peaks
-      val peaksCount = _bbByteBuffer.getInt
+      val peaksCount = _bbByteArrayWrapper.getInt()
       peaksCounts(spectrumSliceIdx) = peaksCount
       //println("peaksCount",peaksCount)
 
@@ -75,7 +74,7 @@ class BytesReader(
   }
 
   private def _getSpectrumIdAt(idx: Int): Long = {
-    _bbByteBuffer.getInt(_spectrumSliceStartPositions(idx)).toLong
+    _bbByteArrayWrapper.getInt(_spectrumSliceStartPositions(idx)).toLong
   }
 
   override def readSpectrumSliceAt(idx: Int): SpectrumSlice = {
@@ -105,6 +104,6 @@ class BytesReader(
     val spectrumSliceStartPos = _spectrumSliceStartPositions(idx) + 8
 
     // Instantiate a new SpectrumData for the corresponding spectrum slice
-    this.readSpectrumSliceData(_bbByteBuffer, spectrumSliceStartPos, peaksBytesSize, de, minMz, maxMz)
+    this.readSpectrumSliceData(_bbByteArrayWrapper, spectrumSliceStartPos, peaksBytesSize, de, minMz, maxMz)
   }
 }

@@ -1,5 +1,7 @@
 package com.github.mzdb4s.io.reader.table
 
+import scala.collection.Seq
+
 import com.github.mzdb4s.io.MzDbContext
 import com.github.sqlite4s.ISQLiteRecordExtraction
 import com.github.sqlite4s.query.SQLiteRecord

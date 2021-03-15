@@ -1,6 +1,7 @@
 package com.github.mzdb4s.db.model
 
 import scala.beans.BeanProperty
+import scala.collection.Seq
 
 import com.github.mzdb4s.msdata._
 import params._

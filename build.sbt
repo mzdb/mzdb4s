@@ -1,16 +1,21 @@
 import scala.language.postfixOps
 import scala.sys.process._
 
+lazy val scala213 = "2.13.5"
+lazy val scala211 = "2.11.12"
+lazy val supportedScalaVersions = List(scala211, scala213)
+
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.2.0-SNAPSHOT",
-  scalaVersion := "2.11.12",
+  version := "0.3.0",
+  scalaVersion := scala213,
+  crossScalaVersions := supportedScalaVersions,
 
-  /*libraryDependencies ++= Seq(
-    "tech.sparse" %%% "pine" % "0.1.7-SNAPSHOT", // TODO: publishLocal with version 0.1.6
-    "biz.enef" %%% "slogging" % "0.6.2-SNAPSHOT", // TODO: publishLocal with version 0.6.1
-    "com.lihaoyi" %%% "utest" % "0.6.7+8-7c499c15" % "test"
-  ),*/
+  libraryDependencies ++= Seq(
+    "com.outr" %%% "scribe" % "3.3.3",
+    "com.lihaoyi" %%% "utest" % "0.7.7" % Test
+  ),
+
   testFrameworks += new TestFramework("utest.runner.Framework")
 )
 
@@ -26,8 +31,8 @@ val sharedJvmSettings = Seq(
 val sharedNativeSettings = Seq(
   // Set to false or remove if you want to show stubs as linking errors
   nativeLinkStubs := true,
-  nativeMode := "release-fast", //"debug", //"release-fast", //"release-full",
-  nativeLTO := "thin",
+  nativeMode := "debug", //"debug", //"release-fast", //"release",
+  nativeLTO := "thin", // "none","thin" // note: thin doesn't work when Rust static libraries are linked
   nativeGC := "immix" //"boehm",
 )
 
@@ -40,7 +45,9 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(
     sharedJvmSettings ++ Seq(
       libraryDependencies ++= Seq(
+        "com.github.jnr" % "jnr-ffi" % "2.2.1",
         "com.almworks.sqlite4java" % "sqlite4java" % "1.0.392",
+
         // OS dependant SQLite library dependency
         // See: https://stackoverflow.com/questions/55591045/sbt-dynamically-detect-building-platform
         sys.props("os.name").toLowerCase match {
@@ -48,36 +55,28 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
           case linux if linux.contains("linux") => "com.almworks.sqlite4java" % "libsqlite4java-linux-amd64" % "1.0.392"
           case mac if mac.contains("mac")  => "com.almworks.sqlite4java" % "libsqlite4java-osx" % "1.0.392"
           case osName: String => throw new RuntimeException(s"Unknown operating system $osName")
-        },
-
-        // TODO: remove me when SN deps are available for SN 0.4.x
-        "tech.sparse" %%% "pine" % "0.1.6",
-        "com.outr" %% "scribe" % "2.7.9",
-        "com.lihaoyi" %%% "utest" % "0.6.8" % Test
+        }
       )
     )
   )
   // Configure Scala-Native settings
   .nativeSettings(
-    /*
-    // Set to false or remove if you want to show stubs as linking errors
-    nativeLinkStubs := true,
-    nativeMode := "debug", //"release-full", //"release-fast",
-    nativeLTO := "thin",
-    */
+
     sharedNativeSettings ++ Seq(
+      nativeMode := "debug",
+
       libraryDependencies ++= Seq(
-        "com.github.david-bouyssie" % "sqlite4s_native0.4.0-M2_2.11" % "0.2.0",
-        "tech.sparse" %%% "pine" % "0.1.7-SNAPSHOT", // TODO: publishLocal with version 0.1.6
-        "com.outr" %%% "scribe" % "2.7.12",
-        "com.lihaoyi" %%% "utest" % "0.7.4" % Test
+        "com.github.david-bouyssie" %%% "sqlite4s" % "0.4.0"
       )
+    ),
+
+    nativeLinkingOptions ++= Seq(
+      "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
     )
   )
 
-lazy val mzdb4sCoreJVM    = mzdb4sCore.jvm
-lazy val mzdb4sCoreNative = mzdb4sCore.native
-
+lazy val mzdb4sCore_JVM    = mzdb4sCore.jvm
+lazy val mzdb4sCore_Native = mzdb4sCore.native
 
 lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
   .crossType(CrossType.Full)
@@ -89,8 +88,25 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings(
 
     sharedNativeSettings ++ Seq(
+
+      /*libraryDependencies ++= Seq(
+        "com.lihaoyi" %%% "utest" % "0.7.7" % Test
+      ),*/
+
+      nativeMode := "release-fast",
+
+      // Link custom native libraries
+      nativeLinkingOptions ++= Seq(
+        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib",
+      ),
+
       // Replace the default "lib" folder by "jars", so that we can use "lib" for native libraries
-      unmanagedBase := baseDirectory.value / "jars",
+      //unmanagedBase := baseDirectory.value / "jars",
+
+      // Add the lib folder to the cleanFiles list (issue: the lib folder itself is deleted)
+      // See: https://stackoverflow.com/questions/10471596/add-additional-directory-to-clean-task-in-sbt-build
+      cleanFiles += baseDirectory.value / "nativelib",
 
       // Configure the task which will build native libraries from C source code
       // See:
@@ -101,10 +117,11 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
         val s: TaskStreams = streams.value
 
         // Create lib directory
-        val libDir = (baseDirectory.value / "lib")
+        val libDir = (baseDirectory.value / "nativelib")
         libDir.mkdir()
 
         s.log.info("Building native libraries...")
+        // TODO: we may include SQLite as well (https://github.com/azadkuh/sqlite-amalgamation)
         val base64Build: Int = if (libDir / "libbase64.so" exists()) 0 else "make --print-directory --directory=./io/native/c/base64/" !<
         val strBuilderBuild: Int = if (libDir / "libstrbuilder.so" exists()) 0 else "make --print-directory --directory=./io/native/c/strbuilder/" !<
         val yxmlBuild: Int = if (libDir / "libyxml.so" exists()) 0 else "make --print-directory --directory=./io/native/c/yxml/" !<
@@ -116,18 +133,7 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
         }
       },
 
-      (compile in Compile) := ((compile in Compile) dependsOn makeLibraries).value,
-
-      // Add the lib folder to the cleanFiles list (issue: the lib folder itself is deleted)
-      // See: https://stackoverflow.com/questions/10471596/add-additional-directory-to-clean-task-in-sbt-build
-      cleanFiles += baseDirectory.value / "lib",
-
-      // Link custom native libraries
-      nativeLinkingOptions ++= Seq("-L" ++ baseDirectory.value.getAbsolutePath() ++ "/lib")
-
-      /*libraryDependencies ++= Seq(
-        "com.lihaoyi" %%% "utest" % "0.7.4" % Test
-      )*/
+      (compile in Compile) := ((compile in Compile) dependsOn makeLibraries).value
     )
   )
 
@@ -141,9 +147,49 @@ lazy val mzdb4sThermo = crossProject(JVMPlatform, NativePlatform)
   .settings( sharedSettings ++ Seq(name := "mzdb4s-io-thermo") )
   .dependsOn( mzdb4sIO )
   .jvmSettings( sharedJvmSettings ++ Seq(
-    libraryDependencies += "thermorawfileparser" % "thermorawfileparser" % "1.2.3" from "file:///" + baseDirectory.value.getAbsolutePath ++ "/lib"
-      //"file:///Users/bwong/git/perf-tools/commonclass/target/scala-2.11/commonclass_2.11-1.0.jar"
+    unmanagedBase := baseDirectory.value / "lib" / "windows"
+
+    /*libraryDependencies ++= Seq(
+      //"thermorawfileparser" % "thermorawfileparser" % "1.2.3" from "file:///" + baseDirectory.value.getAbsolutePath ++ "/lib/windows/ThermoRawFileParser.jar",
+      "com.lihaoyi" %%% "utest" % "0.7.7" % Test
+    )*/
   ))
+  // Configure Scala-Native settings
+  .nativeSettings(
+    sharedNativeSettings ++ Seq(
+
+      /*libraryDependencies ++= Seq(
+        "com.lihaoyi" %%% "utest" % "0.7.4" % Test
+      )*/
+
+      //mainClass in Compile := Some("ThermoToMzDb"),
+
+      nativeMode := "debug", //"debug", //"release-fast"
+
+      // Replace the default "lib" folder by "jars", so that we can use "lib" for native libraries
+      //unmanagedBase := baseDirectory.value / "jars",
+
+      // Link custom native libraries
+      // FIXME: on Linux we also have to do before execution
+      // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/
+      nativeLinkingOptions ++= Seq(
+        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
+      )
+    )
+  )
+
+lazy val mzdb4sThermo_JVM    = mzdb4sThermo.jvm
+lazy val mzdb4sThermo_Native = mzdb4sThermo.native
+
+/*lazy val mzdb4sTimsData = crossProject(JVMPlatform, NativePlatform)
+  .crossType(CrossType.Full)
+  .in(file("io-timsdata"))
+  .settings( sharedSettings ++ Seq(name := "mzdb4s-io-timsdata") )
+  .dependsOn( mzdb4sIO )
+  /*.jvmSettings( sharedJvmSettings ++ Seq(
+    libraryDependencies += "com.github.jnr" % "jnr-ffi" % "2.2.1"
+  ))*/
   // Configure Scala-Native settings
   .nativeSettings(
     sharedNativeSettings ++ Seq(
@@ -159,16 +205,17 @@ lazy val mzdb4sThermo = crossProject(JVMPlatform, NativePlatform)
       //unmanagedBase := baseDirectory.value / "jars",
 
       // Link custom native libraries
+      // FIXME: on Linux we also have to do before execution
+      // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
       nativeLinkingOptions ++= Seq(
-        // FIXME: this doesn't work, we still have to do
-        // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/
         "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
       )
     )
   )
 
-lazy val mzdb4sThermo_JVM    = mzdb4sThermo.jvm
-lazy val mzdb4sThermo_Native = mzdb4sThermo.native
+lazy val mzdb4sTimsData_JVM    = mzdb4sTimsData.jvm
+lazy val mzdb4sTimsData_Native = mzdb4sTimsData.native
+*/
 
 /*
 lazy val mzdb4sProcessing = crossProject(JVMPlatform, NativePlatform)
@@ -208,8 +255,7 @@ lazy val mzdb4sProcessing = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings( // defined in sbt-scala-native
     // Set to false or remove if you want to show stubs as linking errors
     nativeLinkStubs := true,
-    nativeMode := "debug", //"release-fast", //"release-full",
-    nativeLTO := "thin",
+    nativeMode := "debug", //"release-fast", //"release",
     // %%% now include Scala Native. It applies to all selected platforms
     //libraryDependencies += "com.github.david-bouyssie" % "sqlite4s_native0.4.0-M2_2.11" % "0.2.0",
 
@@ -221,9 +267,48 @@ lazy val mzdb4sProcessing = crossProject(JVMPlatform, NativePlatform)
     )
   )
 
-lazy val mzdb4sProcessingJVM    = mzdb4sProcessing.jvm
-lazy val mzdb4sProcessingNative = mzdb4sProcessing.native
+lazy val mzdb4sProcessing_JVM    = mzdb4sProcessing.jvm
+lazy val mzdb4sProcessing_Native = mzdb4sProcessing.native
 */
+
+lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
+  .crossType(CrossType.Full)
+  .in(file("tools"))
+  .settings( sharedSettings ++ Seq(
+    name := "mzdb4s-tools",
+    crossScalaVersions := List(scala213),
+
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %%% "mainargs" % "0.2.1"
+    ),
+
+    // -- SBT assembly settings -- //
+    mainClass in assembly := Some("MzDbTools"),
+    assemblyJarName in assembly := "mzdbtools.jar",
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
+  ))
+  .dependsOn( mzdb4sThermo )
+  .nativeSettings(
+    sharedNativeSettings ++ Seq(
+
+      nativeMode := "release-fast", //"debug", //"release-fast"
+
+      // Link custom native libraries
+      // FIXME: on Linux we also have to do before execution
+      // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/
+      nativeLinkingOptions ++= Seq(
+        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ baseDirectory.in(mzdb4sThermo_Native).value.getAbsolutePath() ++ "/nativelib"
+      )
+    )
+  )
+
+lazy val mzdb4sTools_JVM    = mzdb4sTools.jvm
+lazy val mzdb4sTools_Native = mzdb4sTools.native
 
 // TODO: uncomment this when ready for publishing
 /*

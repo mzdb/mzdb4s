@@ -10,6 +10,7 @@ trait IPeak extends Any {
   def getLeftHwhm(): Float
   def getRightHwhm(): Float
   def getLcContext(): ILcContext
+  def setLcContext(lcContext: ILcContext): Unit
 }
 
 object Peak {

@@ -2,7 +2,6 @@ package com.github.mzdb4s.io.reader.bb
 
 import java.io.IOException
 import java.io.InputStream
-import java.nio.ByteBuffer
 
 import scala.collection.mutable.LongMap
 
@@ -101,7 +100,14 @@ class StreamReader(
 
     if (peaksBytes == null) return null
 
-    val spectrumSliceData = this.readSpectrumSliceData(ByteBuffer.wrap(peaksBytes), 0, peaksBytes.length, de, minMz, maxMz)
+    val spectrumSliceData = this.readSpectrumSliceData(
+      ByteArrayWrapper(peaksBytes, de.byteOrder),
+      0,
+      peaksBytes.length,
+      de,
+      minMz,
+      maxMz
+    )
 
     SpectrumSlice(spectrumHeaderById(spectrumId), spectrumSliceData)
   }

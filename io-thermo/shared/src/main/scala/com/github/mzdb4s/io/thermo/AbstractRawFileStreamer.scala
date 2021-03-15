@@ -2,14 +2,15 @@ package com.github.mzdb4s.io.thermo
 
 import java.io.File
 
+import com.github.mzdb4s.Logging
 import com.github.mzdb4s.db.model.params._
 import com.github.mzdb4s.db.model._
 import com.github.mzdb4s.db.model.params.param._
-import com.github.mzdb4s.io.mzml.MzMLMetaData
+import com.github.mzdb4s.io.mzml._
 import com.github.mzdb4s.io.reader.param._
 import com.github.mzdb4s.msdata.{ActivationType, SpectrumHeader}
 
-abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
+abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extends Logging {
 
   require(rawFilePath.isFile, s"can't find file at '$rawFilePath'")
 
@@ -18,9 +19,107 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
 
   protected val paramTreeParser: IParamTreeParser
 
+  def forEachSpectrum( onEachSpectrum: RawFileSpectrum => Boolean ): Unit
+
   def getMetaDataAsXmlString(): String
 
-  def getMetaData(): MzMLMetaData = {
+  def getMetaData(converterVersion: String): MzMLMetaData = {
+
+    // FIXME: the .Net library should return a correct XML chunk
+    val xmlString = getMetaDataAsXmlString() + "/></mzML>"
+
+    val parsedMetaData = MzMLMetaDataParser.parseMetaData(xmlString)
+
+    val softList = parsedMetaData.softwareList
+    val thermoRawFileParserId = softList.find(_.name == "ThermoRawFileParser").map(_.id).getOrElse(
+      throw new Exception("can't find 'ThermoRawFileParser' software entry in XML meta-data:\n" + xmlString)
+    )
+    val newSoftId = softList.last.id + 1
+
+    parsedMetaData.copy(
+      softwareList = softList ++ Seq(
+        Software(id = newSoftId, name = "Thermo2mzDB", version = converterVersion, paramTree = null)
+      ),
+      processingMethods = Seq(
+        ProcessingMethod(
+          id = 1,
+          number = 1,
+          dataProcessingName = "ThermoRawFileParser mzML streaming",
+          paramTree = Some(ParamTree(
+            cvParams = List(
+              CVParam(accession = "MS:1000544", name = "Conversion to mzML")
+            )
+          )),
+          softwareId = thermoRawFileParserId
+        ),
+        ProcessingMethod(
+          id = 2,
+          number = 2,
+          dataProcessingName = "mzML to mzDB conversion",
+          paramTree = Some(ParamTree(
+            userParams = List(
+              UserParam(name = "Conversion to mzDB", value = "", `type` = "xsd:string")
+            )
+          )),
+          softwareId = newSoftId
+        )
+      )
+    )
+  }
+
+  /*private def _parseFileDescription(xmlString: String): (FileContent,Seq[SourceFile]) = {
+    import ParamTreeParserImpl.tag2richTag
+
+    val xmlTree = pine.internal.HtmlParser.fromString(xmlString, xml = true)
+
+    val fileDescTreeOpt = xmlTree.findFirstChildNamed("fileDescription")
+    val fileContentTreeOpt = fileDescTreeOpt.flatMap(_.findFirstChildNamed("fileContent"))
+    val sourceFileListTreeOpt = fileDescTreeOpt.flatMap(_.findFirstChildNamed("sourceFileList"))
+
+    // Parse File Content
+    val fileContent = FileContent()
+    if (fileContentTreeOpt.isDefined) {
+      ParamTreeParserImpl.parseCvAndUserParams(fileContentTreeOpt.get, fileContent)
+    }
+
+    // Parse source file list
+    val sourceFiles = if (sourceFileListTreeOpt.isEmpty) Seq.empty[SourceFile]
+    else {
+      var fileId = 0
+      sourceFileListTreeOpt.get.filterChildren(_.tagName == "sourceFile").map { sourceFileTree =>
+        fileId += 1
+
+        val sourceFileAttrs = sourceFileTree.attributes
+        val fileName = sourceFileAttrs.getOrElse("name", rawFilePath.getName)
+        val fileLocation = sourceFileAttrs.getOrElse("location", "file:///" + rawFilePath.getCanonicalFile.getAbsolutePath)
+
+        val paramTree = new ParamTree()
+        ParamTreeParserImpl.parseCvAndUserParams(sourceFileTree, paramTree)
+
+        SourceFile(
+          id = fileId,
+          name = fileName,
+          location = fileLocation,
+          paramTree = paramTree
+        )
+      }
+    }
+  }*/
+
+/*
+  // FIXME
+  private def _parseFileDescription(xmlString: String): (FileContent,Seq[SourceFile]) = {
+    val fileContent = FileContent()
+    val sourceFiles = Seq.empty[SourceFile]
+    (fileContent, sourceFiles)
+  }
+
+  def getMetaData(converterVersion: String): MzMLMetaData = {
+
+    // FIXME: the .Net library should return a correct XML chunk
+    val xmlString = getMetaDataAsXmlString() + "/></mzML>"
+
+    val (fileContent, sourceFiles) = _parseFileDescription(xmlString)
 
     // FIXME: parse this information
     val commonInstrumentParams = CommonInstrumentParams(
@@ -58,7 +157,7 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
         name = "IC1",
         paramTree = null,
         componentList = compListBuilder.toComponentList(),
-        softwareId = 1
+        softwareId = Some(1)
       )
     )
 
@@ -66,7 +165,7 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
       ProcessingMethod(
         id = 1,
         number = 1,
-        dataProcessingName = "ProteoWizard file conversion",
+        dataProcessingName = "ThermoRawFileParser mzML streaming",
         paramTree = Some(ParamTree(
           cvParams = List(
             CVParam(accession = "MS:1000544", name = "Conversion to mzML")
@@ -101,16 +200,14 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
     val samples = Seq(Sample(id = 1, name = "UPS1 5fmol R1", paramTree = null))
 
     val softwareList = Seq(
-      // TODO: CVParams
-      Software(id = 1, name = "Xcalibur", version = "2.7.0 SP1", paramTree = null),
-      Software(id = 1, name = "pwiz", version = "3.0.5759", paramTree = null),
-      Software(id = 1, name = "pwiz-mzdb", version = "0.9.10", paramTree = null), // TODO: remove me when mzdb-access is updated
-      Software(id = 1, name = "mzdb4s", version = "0.2.1910", paramTree = null) // TODO: retrieve from file generated by SBT
+      // FIXME: Xcalibur information missing from ThermoRawFileParser
+      //Software(id = 1, name = "Xcalibur", version = "2.7.0 SP1", paramTree = null),
+      Software(id = 1, name = "ThermoRawFileParser", version = "1.2.3", paramTree = null),
+      Software(id = 2, name = "Thermo2mzDB", version = converterVersion, paramTree = null)
     )
 
-    val sourceFiles = Seq(SourceFile(id = 1, name = "OVEMB150205_12.raw", location = "", paramTree = null))
-
     MzMLMetaData(
+      fileContent,
       commonInstrumentParams,
       instrumentConfigurations,
       processingMethods,
@@ -119,7 +216,7 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
       softwareList,
       sourceFiles
     )
-  }
+  }*/
 
   protected def parseSpectrumXmlMetaData(spectrumId: Int, xmlStr: String): (SpectrumXmlMetaData, String) = {
 
@@ -163,6 +260,17 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
 
     val precListAsXmlStr = precursorListBuilder.result()
 
+    // Patch precursor list to match the mzDB specs
+    // FIXME: change the mzDB specs???
+    val precListOpt = if (precListAsXmlStr.isEmpty) None
+    else {
+      val patchedXmlStr = precListAsXmlStr
+        .replaceAllLiterally("  <precursorList count=\"1\">\n","")
+        .replaceAllLiterally("  </precursorList>\n","")
+
+      Some(patchedXmlStr)
+    }
+
     val xmlMetaData = SpectrumXmlMetaData(
       spectrumId = spectrumId,
       paramTree =
@@ -172,7 +280,7 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
            |</params>
            |""".stripMargin,
       scanList = scanListBuilder.result(),
-      precursorList = if (precListAsXmlStr.isEmpty) None else Some(precListAsXmlStr),
+      precursorList = precListOpt,
       productList = None
     )
 
@@ -197,12 +305,32 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
     mzList: Array[Double],
     intensityList: Array[Double]
   ): RawFileSpectrum = {
+    //println("createSpectrum begins")
 
     val scanListParamTree = this.paramTreeParser.parseScanList(xmlMetaData.scanList)
-    val scanStartTimeCvTerm = scanListParamTree.getScans().head.getCVParam(PsiMsCV.SCAN_START_TIME)
+    val firstScan = scanListParamTree.getScans().head
+    val scanStartTimeCvTerm = firstScan.getCVParam(PsiMsCV.SCAN_START_TIME)
     val scanStartTimeUnit = scanStartTimeCvTerm.unitName.getOrElse("")
     assert(scanStartTimeUnit == "minute", s"unsupported scan time unit '$scanStartTimeUnit'")
     val scanTime = scanStartTimeCvTerm.value.toFloat * 60
+
+    var precMzOpt = Option.empty[Double]
+    var precChargeOpt = Option.empty[Int]
+    if (msLevel > 1 && xmlMetaData.precursorList.isDefined) {
+      val prec = this.paramTreeParser.parsePrecursors(xmlMetaData.precursorList.get).head
+      val selIonList = prec.getSelectedIonList()
+      val firstSelIonCVParams = selIonList.getSelectedIons().head.getCVParams()
+      precChargeOpt = firstSelIonCVParams.find(_.getAccession == PsiMsCV.CHARGE_STATE.getAccession()).map(_.getValue.toInt)
+
+      val monoMzOpt = firstScan.getUserParams().find { userParam =>
+        userParam.getName == "[Thermo Trailer Extra]Monoisotopic M/Z:"
+      }
+
+      precMzOpt = if (monoMzOpt.isDefined) monoMzOpt.map(_.getValue.toDouble)
+      else {
+        firstSelIonCVParams.find(_.getAccession == PsiMsCV.SELECTED_ION_MZ.getAccession()).map(_.getValue.toDouble)
+      }
+    }
 
     val peaksCount = mzList.length
     val intensityListAsFloats = new Array[Float](peaksCount)
@@ -241,11 +369,13 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) {
       tic = intensitySum,
       basePeakMz = basePeakMz,
       basePeakIntensity = basePeakIntensity,
-      precursorMz = None,     // FIXME
-      precursorCharge = None, // FIXME
+      precursorMz = precMzOpt,
+      precursorCharge = precChargeOpt,
       bbFirstSpectrumId = id,
       isolationWindow = None // FIXME: retrieve me
     )
+
+    //println("createSpectrum ends")
 
     RawFileSpectrum(intitialId, xmlMetaData, header, mzList, intensityListAsFloats)
   }

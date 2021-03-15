@@ -1,14 +1,17 @@
 package com.github.mzdb4s.io.reader.param
 
-import com.github.mzdb4s.db.model.params._
-import com.github.mzdb4s.db.model.params.param._
-import com.github.sqlite4s.c.util.CUtils
-
+import scala.collection.Seq
 import scala.scalanative.libc.string.strstr
 import scala.scalanative.libc.string.strlen
 import scala.scalanative.unsafe._
 
-private[param] object NativeParamTreeParserImpl {
+import com.github.mzdb4s.db.model.params._
+import com.github.mzdb4s.db.model.params.param._
+import com.github.sqlite4s.c.util.CUtils
+
+// FIXME: keep private
+object NativeParamTreeParserImpl {
+//private[mzdb4s] object NativeParamTreeParserImpl {
 
   private val cvParamsCStr = c"<cvParams>"
   private val cvParamsCStrLen: CInt = strlen(cvParamsCStr).toInt
@@ -169,7 +172,7 @@ private[param] object NativeParamTreeParserImpl {
     _parseAttributeContent(paramChunk, chunkLength, typeCStr, typeStrLen, chunkLength - typeStrLen)
   }
 
-  private def _parseAttributeContent(
+  private[mzdb4s] def _parseAttributeContent(
     xmlChunk: CString,
     chunkLen: CInt,
     attr: CString,
@@ -226,6 +229,7 @@ private[param] object NativeParamTreeParserImpl {
 
   def parseScanList(scanListAsStr: String): ScanList = {
 
+    /*
     // TODO: put this in unit tests
     """<scanList count="1">
       |  <cvParam cvRef="MS" accession="MS:1000795" value="" name="no combination" />
@@ -243,7 +247,7 @@ private[param] object NativeParamTreeParserImpl {
       |  </scan>
       |</scanList>
       |
-      |""".stripMargin
+      |""".stripMargin*/
 
     Zone { implicit z =>
       val scanListAsCStr = toCString(scanListAsStr)
@@ -301,6 +305,148 @@ private[param] object NativeParamTreeParserImpl {
       scanList
     }
 
+  }
+
+  private val precursorListCStr = c"<precursorList "
+  private val precursorCStr = c"<precursor "
+
+  private val spectrumRefCStr = c"""spectrumRef="""
+  private val spectrumRefStrLen = strlen(spectrumRefCStr).toInt
+
+  private val isolationWindowStartCStr = c"<isolationWindow>"
+  private val isolationWindowEndCStr = c"</isolationWindow>"
+
+  private val selectedIonListCStr = c"<selectedIonList "
+  private val selectedIonStartCStr = c"<selectedIon>"
+  private val selectedIonEndCStr = c"</selectedIon>"
+
+  private val activationStartCStr = c"<activation>"
+  private val activationEndCStr = c"</activation>"
+
+  def parsePrecursors(precursorListAsStr: String): Seq[Precursor] = {
+    /*"""<precursorList count="1">
+      |  <precursor spectrumRef="controllerType=0 controllerNumber=1 scan=2">
+      |    <isolationWindow>
+      |      <cvParam cvRef="MS" accession="MS:1000827" value="810.789428710938" name="isolation window target m/z" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |      <cvParam cvRef="MS" accession="MS:1000828" value="1" name="isolation window lower offset" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |      <cvParam cvRef="MS" accession="MS:1000829" value="1" name="isolation window upper offset" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |    </isolationWindow>
+      |    <selectedIonList count="1">
+      |      <selectedIon>
+      |        <cvParam cvRef="MS" accession="MS:1000744" value="810.789428710938" name="selected ion m/z" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
+      |      </selectedIon>
+      |    </selectedIonList>
+      |    <activation>
+      |      <cvParam cvRef="MS" accession="MS:1000045" value="35" name="collision energy" unitAccession="UO:0000266" unitName="electronvolt" unitCvRef="UO" />
+      |      <cvParam cvRef="MS" accession="MS:1000133" value="" name="collision-induced dissociation" />
+      |    </activation>
+      |  </precursor>
+      |</precursorList>
+      |""".stripMargin*/
+
+    Zone { implicit z =>
+      val precursorListChunkAsCStr = toCString(precursorListAsStr)
+      val precursorListXmlChunk = strstr(precursorListChunkAsCStr, precursorListCStr)
+
+      if (precursorListXmlChunk != null) {
+        val precursorsCount = _parseAttributeContent(precursorListXmlChunk, 25, countCStr, countStrLen, 4)
+        assert(precursorsCount == "1", "parsing of multiple precursors is not yet implemented (please open an issue on github)")
+      }
+
+      val precursorXmlChunk = strstr(precursorListChunkAsCStr, precursorCStr)
+      val isolationWindowXmlChunk = strstr(precursorXmlChunk, isolationWindowStartCStr)
+      val precursorAttrLen = if (isolationWindowXmlChunk == null) precursorListAsStr.length
+      else (isolationWindowXmlChunk - precursorXmlChunk).toInt
+
+      val spectrumRef = _parseAttributeContent(precursorXmlChunk, precursorAttrLen, spectrumRefCStr, spectrumRefStrLen, bufferSize = precursorAttrLen)
+
+      val prec = new Precursor(if (spectrumRef == null) "" else spectrumRef)
+
+      // --- Parse isolation window --- //
+      if (isolationWindowXmlChunk != null) {
+        val isolationWindowXmlChunkOffset = strstr(precursorXmlChunk, isolationWindowEndCStr) - isolationWindowXmlChunk
+
+        val isolationWindowCvParams = this._parseCvParams(isolationWindowXmlChunk, isolationWindowXmlChunkOffset.toInt)
+
+        val isolationWindow = new IsolationWindowParamTree()
+        isolationWindow.setCVParams(isolationWindowCvParams)
+
+        prec.setIsolationWindow(isolationWindow)
+      }
+
+      // --- Parse selected ions --- //
+      val selectedIonListXmlChunk = strstr(precursorXmlChunk, selectedIonListCStr)
+
+      if (selectedIonListXmlChunk != null) {
+        val selectedIonsCount = _parseAttributeContent(selectedIonListXmlChunk, 27, countCStr, countStrLen, 4)
+        assert(selectedIonsCount == "1", "parsing of multiple selected ions is not yet implemented (please open an issue on github)")
+
+        val selectedIonXmlChunk = strstr(selectedIonListXmlChunk, selectedIonStartCStr)
+        val selectedIonXmlChunkOffset = strstr(selectedIonListXmlChunk, selectedIonEndCStr) - selectedIonXmlChunk
+
+        val selectedIonCvParams = this._parseCvParams(selectedIonXmlChunk, selectedIonXmlChunkOffset.toInt)
+
+        val selectedIonList = new SelectedIonList(selectedIonsCount.toInt)
+        val selectedIon = new SelectedIon()
+        selectedIon.setCVParams(selectedIonCvParams)
+        selectedIonList.setSelectedIons(Seq(selectedIon))
+
+        prec.setSelectedIonList(selectedIonList)
+      }
+
+      // --- Parse activation type --- //
+      val activationXmlChunk = strstr(precursorXmlChunk, activationStartCStr)
+
+      if (activationXmlChunk != null) {
+        val activationXmlChunkOffset = strstr(precursorXmlChunk, activationEndCStr) - activationXmlChunk
+
+        val activationCvParams = this._parseCvParams(activationXmlChunk, activationXmlChunkOffset.toInt)
+
+        val activation = new Activation()
+        activation.setCVParams(activationCvParams)
+
+        prec.setActivation(activation)
+      }
+
+      Seq(prec)
+    }
+
+  }
+
+  def parseComponentList(componentListAsStr: String): ComponentList = {
+    null
+  }
+
+  private val fileContentStartCStr = c"<fileContent>"
+  private val fileContentEndCStr = c"</fileContent>"
+
+  def parseFileContent(fileContentAsStr: String): FileContent = {
+    /*"""<fileContent>
+      |  <cvParam cvRef="MS" accession="MS:1000579" value="" name="MS1 spectrum" />
+      |  <cvParam cvRef="MS" accession="MS:1000580" value="" name="MSn spectrum" />
+      |</fileContent>""".stripMargin*/
+
+    Zone { implicit z =>
+      val fileContentChunkAsCStr = toCString(fileContentAsStr)
+
+      val fileContentStartXmlChunk = strstr(fileContentChunkAsCStr, fileContentStartCStr)
+      assert(fileContentStartXmlChunk != null, s"can't find a 'fileContent' start tag in the XML chunk:\n$fileContentAsStr")
+
+      val fileContentEndXmlChunk = strstr(fileContentChunkAsCStr, fileContentEndCStr)
+      assert(fileContentEndXmlChunk != null, s"can't find a 'fileContent' end tag in the XML chunk:\n$fileContentAsStr")
+
+      val fileContentXmlChunkOffset = (fileContentEndXmlChunk - fileContentChunkAsCStr).toInt
+      _parseCvParams(fileContentChunkAsCStr, fileContentXmlChunkOffset)
+
+      val fileContentCvParams = this._parseCvParams(fileContentChunkAsCStr, fileContentXmlChunkOffset)
+      val fileContentUserParams = this._parseUserParams(fileContentChunkAsCStr, fileContentXmlChunkOffset)
+
+      val fileContent = FileContent()
+      fileContent.setCVParams(fileContentCvParams)
+      fileContent.setUserParams(fileContentUserParams)
+
+      fileContent
+    }
   }
 
   /*
@@ -440,13 +586,5 @@ private[param] object NativeParamTreeParserImpl {
       .setType(attributes.get("type").orNull)
   }*/
 
-  /*
 
-  def parsePrecursor(precursorAsStr: String): Precursor = {
-    null
-  }
-
-  def parseComponentList(componentListAsStr: String): ComponentList = {
-    null
-  }*/
 }

@@ -2,6 +2,7 @@ package com.github.mzdb4s
 
 import java.io.{File, FileInputStream, FileNotFoundException}
 
+import scala.collection.Seq
 import scala.collection.mutable.LongMap
 import com.github.mzdb4s.db.model._
 import com.github.mzdb4s.io.MzDbContext
@@ -20,7 +21,7 @@ import com.github.sqlite4s._
 object MzDbReader {
   protected def readWholeFile(file: File): Unit = {
     val fis = new FileInputStream(file)
-    val b = new Array[Byte](1024 * 1024)
+    val b = new Array[Byte](4096 * 4096)
     while (fis.available != 0) fis.read(b)
     fis.close()
   }
@@ -32,8 +33,7 @@ class MzDbReader(
   val logConnections: Boolean
 )(implicit sf: ISQLiteFactory) extends AbstractMzDbReader {
 
-  // Disable logs for JVM implementation
-  // TODO: do the same for Native implementation
+  // Disable SQLite driver connection logs
   if (!logConnections) {
     sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
   }

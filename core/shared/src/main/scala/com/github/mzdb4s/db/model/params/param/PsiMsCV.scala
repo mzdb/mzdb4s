@@ -10,6 +10,7 @@ object PsiMsCV extends Enumeration {
 
   // TODO: import full enumeration from PWIZ
   val ACQUISITION_PARAMETER = Term("MS:1001954")
+  val CHARGE_STATE = Term("MS:1000041")
   val FILTER_STRING = Term("MS:1000512")
   val ISOLATION_WINDOW_TARGET_MZ = Term("MS:1000827")
   val ISOLATION_WINDOW_LOWER_OFFSET = Term("MS:1000828")

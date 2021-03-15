@@ -12,14 +12,14 @@ object InstrumentConfiguration {
 case class InstrumentConfiguration(
   @BeanProperty var id: Int,
   @BeanProperty var name: String,
-  @BeanProperty var softwareId: Int,
+  @BeanProperty var softwareId: Option[Int], // FIXME: should not be NOT NULL in the mzDB file
   protected val paramTree: ParamTree,
   @BeanProperty var componentList: ComponentList
 ) extends AbstractTableModel[Int](paramTree) {
 
   def tableName(): String = InstrumentConfiguration.TABLE_NAME
 
-  def this(id: Int, name: String, softwareId: Int) {
+  def this(id: Int, name: String, softwareId: Option[Int]) {
     this(id, name, softwareId, null, null)
   }
 
@@ -29,20 +29,17 @@ object MzDbHeader {
   val TABLE_NAME = "mzdb"
 }
 
-// TODO: add fileContent add contacts?
+// TODO: add contacts?
 case class MzDbHeader(
   @BeanProperty var version: String,
-  @BeanProperty var creationTimestamp: Int,
-  protected var paramTree: ParamTree
+  @BeanProperty var creationTimestamp: Int, // epoch in seconds
+  @BeanProperty var fileContent: FileContent,
+  protected var paramTree: ParamTree = null // TODO: Option
 ) extends AbstractTableModel[Int](paramTree) {
 
   var id = 1
 
   override def tableName(): String = MzDbHeader.TABLE_NAME
-
-  def this(version: String, creationTimestamp: Int) {
-    this(version, creationTimestamp, null)
-  }
 
 }
 
@@ -56,7 +53,10 @@ case class Run(
   // TODO: change from Date to Instant type
   //protected Instant startTimestamp;
   @BeanProperty var startTimestamp: Date,
-  protected var paramTree: ParamTree
+  protected var paramTree: ParamTree,
+  @BeanProperty var instrumentConfigId: Option[Int] = None, // FIXME: should not be optional here
+  @BeanProperty var sampleId: Option[Int] = None, // FIXME: should not be NOT NULL in mzDB
+  @BeanProperty var sourceFileId: Option[Int] = None
 ) extends AbstractTableModel[Int](paramTree) {
 
   override def tableName(): String = Run.TABLE_NAME

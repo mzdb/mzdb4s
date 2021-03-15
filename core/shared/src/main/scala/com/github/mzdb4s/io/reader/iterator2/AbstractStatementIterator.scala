@@ -1,4 +1,4 @@
-package com.github.mzdb4s.io.reader.iterator2
+/*package com.github.mzdb4s.io.reader.iterator2
 
 import java.util
 
@@ -34,4 +34,4 @@ abstract class AbstractStatementIterator[E] (val statement: ISQLiteStatement) ex
   }
 
   //override def remove() = throw new UnsupportedOperationException("remove operation is not supported")
-}
+}*/

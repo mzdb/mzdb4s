@@ -1,7 +1,7 @@
 package com.github.mzdb4s.db.model.params
 
-//import java.util
-//import javax.xml.bind.annotation.XmlElement
+import scala.collection.Seq
+
 import param._
 
 /**
