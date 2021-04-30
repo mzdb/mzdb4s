@@ -15,6 +15,7 @@ object AcquisitionMode extends Enumeration {
     "DDA acquisition",
     "Data Dependant Acquisition (Thermo designation), Warning: in ABI this is called IDA (Information Dependant Acquisition)"
   )
+  // TODO: add DIA mode
   val SWATH = Mode(
     "SWATH acquisition",
     "ABI Swath acquisition or Thermo DIA acquisition"

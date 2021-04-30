@@ -10,6 +10,7 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.LongMap
 
 import com.github.mzdb4s.db.model._
+import com.github.mzdb4s.db.model.params.ParamTree
 import com.github.mzdb4s.db.model.params.param._
 import com.github.mzdb4s.db.table._
 import com.github.mzdb4s.msdata._
@@ -319,8 +320,18 @@ abstract class AbstractMzDbWriter extends Logging {
       stmt.bind(1, run.getName)
       stmt.bind(2, formatDateToISO8601String(run.getStartTimestamp))
 
-      if (run.getParamTree().isEmpty) stmt.bind(3, "<params />") // FIXME: bindNull
-      else stmt.bind(3, _xmlSerializer.serializeParamTree(run.getParamTree().get))
+      // Inject the 'acquisition parameter' CV param if it doesn't exist
+      val runParamTree = run.getParamTree().getOrElse(ParamTree())
+      val cvParams = runParamTree.getCVParams()
+      if (!cvParams.exists(_.accession == PsiMsCV.ACQUISITION_PARAMETER.getAccession())) {
+        // FIXME: implement better AcquisitionMode => replace isDIA by the AcquisitionMode
+        val mode = if (isDIA) AcquisitionMode.SWATH.getName() else AcquisitionMode.DDA.getName()
+        runParamTree.setCVParams(cvParams ++ Seq(
+          CVParam(PsiMsCV.ACQUISITION_PARAMETER.getAccession(),"acquisition parameter",value=mode)
+        ))
+      }
+
+      stmt.bind(3, _xmlSerializer.serializeParamTree(runParamTree))
 
       // FIXME: do not use default values
       stmt.bindNull(4)
