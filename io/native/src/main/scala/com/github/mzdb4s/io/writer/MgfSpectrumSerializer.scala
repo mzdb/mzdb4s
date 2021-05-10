@@ -84,7 +84,7 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
 
     val title = if (!exportProlineTitle) titleBySpectrumId(spectrumHeader.getSpectrumId())
     else {
-      val timeInMinutes = MathUtils.round(time / 60,3)
+      val timeInMinutes = MathUtils.round(time / 60,4)
 
       val cycle = spectrumHeader.getCycle
       val rawFile = mzDbReader.getFirstSourceFileName().split('.').headOption.getOrElse {
@@ -94,8 +94,8 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
       s"first_cycle:$cycle;last_cycle:$cycle;first_scan:$id;last_scan:$id;first_time:$timeInMinutes;last_time:$timeInMinutes;raw_file_identifier:$rawFile;"
     }
 
-    val mgfSpectrumHeader = if (charge != 0) new MgfWriter.MgfHeader(title, precMz, charge, time, id)
-    else new MgfWriter.MgfHeader(title, precMz, time, id)
+    val mgfSpectrumHeader = if (charge != 0) MgfWriter.createMgfHeader(title, precMz, charge, time, id)
+    else MgfWriter.createMgfHeader(title, precMz, time, id)
 
     Zone { implicit z =>
       val mgfHeaderAsStr = mgfSpectrumHeader.toString()

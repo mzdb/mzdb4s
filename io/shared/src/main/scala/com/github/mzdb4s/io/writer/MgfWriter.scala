@@ -8,10 +8,10 @@ import com.github.mzdb4s.{Logging, MzDbReader}
 import com.github.mzdb4s.db.model.params.Precursor
 import com.github.mzdb4s.db.model.params.param.PsiMsCV
 import com.github.mzdb4s.db.table.SpectrumTable
+import com.github.mzdb4s.io.mgf._
 import com.github.mzdb4s.msdata._
 import com.github.sqlite4s.{ISQLiteFactory, SQLiteQuery}
 import com.github.sqlite4s.query.SQLiteRecord
-
 
 
 /**
@@ -339,77 +339,40 @@ object MgfWriter {
     }
   }
 
-  object MgfField extends Enumeration {
-    val BEGIN_IONS = Value("BEGIN IONS")
-    val END_IONS = Value("END IONS")
-    val TITLE, PEPMASS, CHARGE, RTINSECONDS, SCANS = Value
+
+  /*def createMgfHeader(title: String, precMz: Double, charge: Int) {
+    this(
+      Seq(
+        MgfHeaderEntry(MgfField.TITLE, title),
+        // FIXME: use the trailer corresponding to the acquisition polarity (see mzDB meta-data)
+        MgfHeaderEntry(MgfField.PEPMASS, round(precMz,4)),
+        MgfHeaderEntry(MgfField.CHARGE, charge, "+")
+      )
+    )
+  }*/
+
+  def createMgfHeader(title: String, precMz: Double, rt: Float, scanNumber: Int): MgfHeader = {
+    MgfHeader(
+      Seq(
+        MgfHeaderEntry(MgfField.TITLE, title),
+        MgfHeaderEntry(MgfField.PEPMASS, mathUtils.round(precMz,4)),
+        MgfHeaderEntry(MgfField.RTINSECONDS, mathUtils.round(rt,3)),
+        MgfHeaderEntry(MgfField.SCANS, scanNumber)
+      )
+    )
   }
 
-  class MgfHeader private(var entries: Seq[MgfHeaderEntry]) {
-
-    /*def this(title: String, precMz: Double, charge: Int) {
-      this(
-        Seq(
-          MgfHeaderEntry(MgfField.TITLE, title),
-          // FIXME: use the trailer corresponding to the acquisition polarity (see mzDB meta-data)
-          MgfHeaderEntry(MgfField.PEPMASS, round(precMz,4)),
-          MgfHeaderEntry(MgfField.CHARGE, charge, "+")
-        )
+  def createMgfHeader(title: String, precMz: Double, charge: Int, rt: Float, scanNumber: Int): MgfHeader = {
+    MgfHeader(
+      Seq(
+        MgfHeaderEntry(MgfField.TITLE, title),
+        MgfHeaderEntry(MgfField.PEPMASS, mathUtils.round(precMz,4)),
+        MgfHeaderEntry(MgfField.CHARGE, charge, Some("+")),
+        MgfHeaderEntry(MgfField.RTINSECONDS, mathUtils.round(rt,2)),
+        MgfHeaderEntry(MgfField.SCANS, scanNumber)
       )
-    }*/
-
-    def this(title: String, precMz: Double, rt: Float, scanNumber: Int) {
-      this(
-        Seq(
-          MgfHeaderEntry(MgfField.TITLE, title),
-          MgfHeaderEntry(MgfField.PEPMASS, mathUtils.round(precMz,4)),
-          MgfHeaderEntry(MgfField.RTINSECONDS, mathUtils.round(rt,2)),
-          MgfHeaderEntry(MgfField.SCANS, scanNumber)
-        )
-      )
-    }
-
-    def this(title: String, precMz: Double, charge: Int, rt: Float, scanNumber: Int) {
-      this(
-        Seq(
-          MgfHeaderEntry(MgfField.TITLE, title),
-          MgfHeaderEntry(MgfField.PEPMASS, mathUtils.round(precMz,4)),
-          MgfHeaderEntry(MgfField.CHARGE, charge, "+"),
-          MgfHeaderEntry(MgfField.RTINSECONDS, mathUtils.round(rt,2)),
-          MgfHeaderEntry(MgfField.SCANS, scanNumber)
-        )
-      )
-    }
-
-    def appendToStringBuilder(sb: StringBuilder): StringBuilder = {
-      sb.append(MgfField.BEGIN_IONS).append(MgfWriter.LINE_SEPARATOR)
-
-      for (entry <- entries) {
-        entry.appendToStringBuilder(sb).append(MgfWriter.LINE_SEPARATOR)
-      }
-
-      sb
-    }
-
-    override def toString: String = {
-      val sb = new StringBuilder
-      this.appendToStringBuilder(sb).toString
-    }
+    )
   }
-
-  case class MgfHeaderEntry protected[MgfWriter](field: MgfWriter.MgfField.Value, value: Any, trailer: String = null) {
-
-    def appendToStringBuilder(sb: StringBuilder): StringBuilder = {
-      sb.append(field).append("=").append(value)
-      if (this.trailer != null) sb.append(trailer)
-      sb
-    }
-
-    override def toString: String = {
-      this.appendToStringBuilder(new StringBuilder()).toString
-    }
-  }
-
 }
 
 class MgfWriter(

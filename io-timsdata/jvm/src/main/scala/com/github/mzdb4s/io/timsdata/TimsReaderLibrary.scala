@@ -5,65 +5,33 @@ import jnr.ffi.annotations.{Delegate, Out}
 import jnr.ffi.byref.PointerByReference
 import jnr.ffi.types.size_t
 
-object TimsReaderLibrary {
+trait OnEachFrameCallback {
+  @Delegate def onResult(
+    frameId: Long,
+    @size_t firstScan: Int,
+    @size_t lastScan: Int,
+    @Out mzValues: Pointer,
+    @Out intensityValues: Pointer,
+    @size_t peaksCount: Int,
+    context: Pointer
+  ): Unit
+  //@Delegate def onResult(frameId: Long, @size_t peaksCount: Int, @Out mzValues: Array[Double], @Out intensityValues: Array[Float]): Unit
+}
 
-  trait OnEachFrameCallback {
-    @Delegate def onResult(
-      frameId: Long,
-      @size_t firstScan: Int,
-      @size_t lastScan: Int,
-      @Out mzValues: Pointer,
-      @Out intensityValues: Pointer,
-      @size_t peaksCount: Int,
-      context: Pointer
-    ): Unit
-    //@Delegate def onResult(frameId: Long, @size_t peaksCount: Int, @Out mzValues: Array[Double], @Out intensityValues: Array[Float]): Unit
-  }
+/*final class TimsReaderError(val runtime: Runtime) extends Struct(runtime) {
+  final val code = new Signed32()
+  final val message = new String()
+}*/
 
-  /*final class TimsReaderError(val runtime: Runtime) extends Struct(runtime) {
-    final val code = new Signed32()
-    final val message = new String()
-  }*/
-
-  trait TimsReaderInterface {
-    def timsreader_init_logger(): Unit
-    def timsreader_print_text(): Unit
-    def timsreader_for_each_merged_spectrum(
-      timsDataDir: String,
-      cbContext: Pointer,
-      cb: OnEachFrameCallback,
-      error: PointerByReference
-    ): Int
-  }
-
-  //println(new File("../target/debug/libproteomics_fasta.dll").isFile)
-  private var rustLib: TimsReaderInterface = _
-  private var runtime: jnr.ffi.Runtime = _
-
-  def loadLibrary(libraryName: String): Unit = {
-    rustLib = LibraryLoader.create(classOf[TimsReaderInterface]).load(libraryName)
-    runtime = jnr.ffi.Runtime.getRuntime(rustLib)
-  }
-
-  def getLibrary(): TimsReaderInterface = rustLib
-
-  def printText(): Unit = {
-    assert(rustLib != null, "the library is not loaded")
-    rustLib.timsreader_print_text()
-  }
-
-  def initLogger(): Unit = {
-    assert(rustLib != null, "the library is not loaded")
-    rustLib.timsreader_init_logger()
-  }
-
-
-
-  /*val err: Pointer = null
-  err.getInt(0)
-  err.getString(4)*/
-
-  //err.
+trait TimsReaderLibrary {
+  def timsreader_init_logger(): Unit
+  def timsreader_print_text(): Unit
+  def timsreader_for_each_merged_spectrum(
+    timsDataDir: String,
+    cbContext: Pointer,
+    cb: OnEachFrameCallback,
+    error: PointerByReference
+  ): Int
 }
 
 /*object TDFLibrary {

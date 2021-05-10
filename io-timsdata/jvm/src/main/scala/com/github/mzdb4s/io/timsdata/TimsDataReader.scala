@@ -1,14 +1,12 @@
 package com.github.mzdb4s.io.timsdata
 
-import com.github.mzdb4s.io.timsdata.TimsReaderLibrary.OnEachFrameCallback
 import jnr.ffi.Pointer
 import jnr.ffi.byref.PointerByReference
-
 
 object TimsDataReader extends  ITimsDataReader {
 
   def forEachMergedSpectrum(timsDataDir: String, onEachMergedSpectrum: ForEachMergedSpectrumCb): Unit = {
-    val rustLib = TimsReaderLibrary.getLibrary()
+    val rustLib = TimsReaderLibraryFactory.getLibrary()
     assert(rustLib != null, "the library is not loaded")
 
     val nullCbContext: Pointer = null
@@ -17,31 +15,18 @@ object TimsDataReader extends  ITimsDataReader {
     val rc = rustLib.timsreader_for_each_merged_spectrum(
       timsDataDir,
       nullCbContext,
-      new Object with OnEachFrameCallback {
-        /*
-        firstScan: CInt, lastScan: CInt,
-            mzValuesPtr: Ptr[CDouble], intensityValuesPtr: Ptr[CFloat], peaksCount: CInt, context: Ptr[Unit]
-         */
-        def onResult(
-          frameId: Long, firstScan: Int, lastScan: Int,
-          mzValuesPtr: Pointer, intensityValuesPtr: Pointer, peaksCount: Int, context: Pointer
-        ): Unit = {
-          //println("peaksCount: " + peaksCount)
+      (frameId: Long, firstScan: Int, lastScan: Int, mzValuesPtr: Pointer, intensityValuesPtr: Pointer, peaksCount: Int, context: Pointer) => {
+        //println("peaksCount: " + peaksCount)
 
-          val mzValues = new Array[Double](peaksCount)
-          val intensityValues = new Array[Float](peaksCount)
+        val mzValues = new Array[Double](peaksCount)
+        val intensityValues = new Array[Float](peaksCount)
 
-          for (i <- 0 until peaksCount) {
-            mzValues(i) = mzValuesPtr.getDouble(i * 8)
-            intensityValues(i) = intensityValuesPtr.getFloat(i * 4)
-          }
-
-          onEachMergedSpectrum(frameId, firstScan, lastScan, mzValues, intensityValues)
+        for (i <- 0 until peaksCount) {
+          mzValues(i) = mzValuesPtr.getDouble(i * 8)
+          intensityValues(i) = intensityValuesPtr.getFloat(i * 4)
         }
 
-        /*def onResult(frameId: Long, peaksCount: Int, mzValues: Array[Double], intensityValues: Array[Float]): Unit = {
-          onEachFrame(frameId, mzValues, intensityValues)
-        }*/
+        onEachMergedSpectrum(frameId, firstScan, lastScan, mzValues, intensityValues)
       },
       errMsgPtr
     )

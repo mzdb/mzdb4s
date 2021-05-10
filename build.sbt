@@ -7,7 +7,7 @@ lazy val supportedScalaVersions = List(scala211, scala213)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.0",
+  version := "0.4.1",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
@@ -305,7 +305,7 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings(
     sharedNativeSettings ++ Seq(
 
-      nativeMode := "debug", //"debug", //"release-fast"
+      nativeMode := "release-fast", //"debug", //"release-fast"
 
       // Link custom native libraries
       // FIXME: on Linux we also have to do before execution

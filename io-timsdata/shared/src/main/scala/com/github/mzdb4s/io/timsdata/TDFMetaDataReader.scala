@@ -95,12 +95,12 @@ class TDFMetaDataReader(
       val precId = stmt.columnLong(0)
       val largestPeakMz = stmt.columnDouble(1)
       val avgMz = stmt.columnDouble(2)
-      val monoIsotopMz = stmt.columnDouble(3)
-      val charge = stmt.columnInt(4)
+      val monoIsotopMz = if (stmt.columnNull(3)) None else Some(stmt.columnDouble(3))
+      val charge = if (stmt.columnNull(4)) None else Some(stmt.columnInt(4))
       val scanNbr = stmt.columnDouble(5)
       val intensity = stmt.columnDouble(6).toFloat
-      val parentFr = stmt.columnInt(7)
-      precursors += TDFPrecursor(precId, largestPeakMz, avgMz, monoIsotopMz, charge, scanNbr, intensity, parentFr)
+      val parentFrameId = stmt.columnInt(7)
+      precursors += TDFPrecursor(precId, largestPeakMz, avgMz, monoIsotopMz, charge, scanNbr, intensity, parentFrameId)
     })
 
     precursors
@@ -201,12 +201,14 @@ case class TDFPrecursor(
   id: Long,
   largestPeakMz: Double,
   averageMz: Double,
-  monoIsotopicMz: Double,
-  charge: Int,
+  monoIsotopicMz: Option[Double],
+  charge: Option[Int],
   scanNumber: Double,
   intensity: Float,
   parentFrameId: Int
-)
+) {
+  def mz(): Double = monoIsotopicMz.getOrElse(averageMz)
+}
 
 object MsType extends Enumeration {
   val MS = Value(0)
