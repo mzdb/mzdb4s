@@ -7,7 +7,7 @@ lazy val supportedScalaVersions = List(scala211, scala213)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.1",
+  version := "0.4.2",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
