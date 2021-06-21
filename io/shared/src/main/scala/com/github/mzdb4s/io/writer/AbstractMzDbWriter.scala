@@ -6,7 +6,6 @@ import com.github.mzdb4s.Logging
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.HashSet
 import scala.collection.mutable.LongMap
 
 import com.github.mzdb4s.db.model._
@@ -207,7 +206,7 @@ abstract class AbstractMzDbWriter extends Logging {
     if (this._connection == null) throw new IllegalStateException("The method open() must first be called")
 
     // --- INSERT DATA PROCESSINGS --- //
-    var stmt = _connection.prepare(s"INSERT INTO ${DataProcessingTable.tableName} VALUES (NULL, ?)", false)
+    var stmt = _connection.prepare(s"INSERT INTO ${DataProcessingTable.tableName} VALUES (NULL, ?)", cached = false)
     val procMethods = metaData.getProcessingMethods
     val dpNames = procMethods.map(_.dataProcessingName).distinct
     val dpIdByName = dpNames.map { dpName =>
@@ -221,12 +220,12 @@ abstract class AbstractMzDbWriter extends Logging {
     stmt.dispose()
 
     // --- INSERT PROCESSING METHODS --- //
-    stmt = _connection.prepare(s"INSERT INTO ${ProcessingMethodTable.tableName} VALUES (NULL, ?, ?, ?, ?, ?)", false)
+    stmt = _connection.prepare(s"INSERT INTO ${ProcessingMethodTable.tableName} VALUES (NULL, ?, ?, ?, ?, ?)", cached = false)
 
     for (procMethod <- procMethods) {
       stmt.bind(1, procMethod.getNumber)
-      if (procMethod.getParamTree.isEmpty) stmt.bindNull(2)
-      else stmt.bind(2, _xmlSerializer.serializeParamTree(procMethod.getParamTree.get))
+      if (procMethod.getParamTree().isEmpty) stmt.bindNull(2)
+      else stmt.bind(2, _xmlSerializer.serializeParamTree(procMethod.getParamTree().get))
       stmt.bindNull(3)
       stmt.bind(4, dpIdByName(procMethod.getDataProcessingName))
       stmt.bind(5, procMethod.getSoftwareId)
@@ -236,15 +235,15 @@ abstract class AbstractMzDbWriter extends Logging {
     stmt.dispose()
 
     // --- INSERT SHARED PARAM TREES --- //
-    stmt = _connection.prepare("INSERT INTO " + SharedParamTreeTable.tableName + " VALUES (NULL, ?, ?)", false)
-    stmt.bind(1, _xmlSerializer.serializeParamTree(metaData.getCommonInstrumentParams.getParamTree))
+    stmt = _connection.prepare("INSERT INTO " + SharedParamTreeTable.tableName + " VALUES (NULL, ?, ?)", cached = false)
+    stmt.bind(1, _xmlSerializer.serializeParamTree(metaData.getCommonInstrumentParams.getParamTree()))
     stmt.bind(2, "CommonInstrumentParams")
     stmt.step()
     stmt.reset()
     stmt.dispose()
 
     // --- INSERT INSTRUMENT CONFIGS --- //
-    stmt = _connection.prepare("INSERT INTO " + InstrumentConfigurationTable.tableName + " VALUES (NULL, ?, NULL, ?, NULL,  ?)", false)
+    stmt = _connection.prepare("INSERT INTO " + InstrumentConfigurationTable.tableName + " VALUES (NULL, ?, NULL, ?, NULL,  ?)", cached = false)
     val instConfigs = metaData.getInstrumentConfigurations
     for (instConfig <- instConfigs; if instConfig.getComponentList != null) {
       stmt.bind(1, instConfig.getName)
@@ -256,14 +255,14 @@ abstract class AbstractMzDbWriter extends Logging {
     stmt.dispose()
 
     // --- INSERT MZDB HEADER --- //
-    stmt = _connection.prepare(s"INSERT INTO ${MzdbTable.tableName} VALUES (?, ?, ?, ?, ?)", false)
+    stmt = _connection.prepare(s"INSERT INTO ${MzdbTable.tableName} VALUES (?, ?, ?, ?, ?)", cached = false)
 
     val mzDbHeader = metaData.getMzDbHeader
 
     /*
     // SMALL TEMP HACK: change BB sizes because we currently store each spectrum in a single BB
     // FIXME: remove this hack
-    var mzdbHeaderParams = mzDbHeader.getParamTree
+    var mzdbHeaderParams = mzDbHeader.getParamTree()
     val patchedUserParams = mzdbHeaderParams.getUserParams().map { userParam =>
       if (userParam.name == "ms1_bb_mz_width") userParam.copy(value = "10000")
       else if (userParam.name == "ms1_bb_time_width") userParam.copy(value = "0")
@@ -314,7 +313,7 @@ abstract class AbstractMzDbWriter extends Logging {
     stmt.dispose()
 
     // --- INSERT RUNS --- //
-    stmt = _connection.prepare(s"INSERT INTO ${RunTable.tableName} VALUES (NULL,?,?,?,?,?,?,?,?,?)", false)
+    stmt = _connection.prepare(s"INSERT INTO ${RunTable.tableName} VALUES (NULL,?,?,?,?,?,?,?,?,?)", cached = false)
     val runs = metaData.getRuns
     for (run <- runs) {
       stmt.bind(1, run.getName)
@@ -345,41 +344,48 @@ abstract class AbstractMzDbWriter extends Logging {
     }
     stmt.dispose()
 
-    // --- INSERT SAMPLES --- //
-    stmt = _connection.prepare(s"INSERT INTO ${SampleTable.tableName} VALUES (NULL, ?, ?, NULL)", false)
-    val samples = metaData.getSamples
-    for (sample <- samples) {
-      stmt.bind(1, sample.getName)
-      if (sample.getParamTree.isEmpty) stmt.bind(2, "<params />") // FIXME: bindNull
-      else stmt.bind(2, _xmlSerializer.serializeParamTree(sample.getParamTree.get))
+    // --- INSERT SOURCE FILES --- //
+    stmt = _connection.prepare(s"INSERT INTO ${SourceFileTable.tableName} VALUES (NULL, ?, ?, ?, NULL)", cached = false)
+    val sourceFiles = metaData.getSourceFiles()
+    for (sourceFile <- sourceFiles) {
+      stmt.bind(1, sourceFile.getName)
+      stmt.bind(2, sourceFile.getLocation)
+      // FIXME: source file paramtree should be defined
+      if (sourceFile.getParamTree().isEmpty) stmt.bind(3, "")
+      else stmt.bind(3, _xmlSerializer.serializeParamTree(sourceFile.getParamTree().get))
       stmt.step()
       stmt.reset()
     }
     stmt.dispose()
 
+    // --- INSERT SAMPLES --- //
+    stmt = _connection.prepare(s"INSERT INTO ${SampleTable.tableName} VALUES (NULL, ?, ?, NULL)", cached = false)
+
+    val samples = metaData.getSamples()
+    if (samples.isEmpty) {
+      val sampleName = sourceFiles.headOption.map(_.getName).getOrElse(dbLocation.getName.split('.').headOption.getOrElse("undefined"))
+      stmt.bind(1, sampleName)
+      stmt.step()
+    } else {
+      for (sample <- samples) {
+        stmt.bind(1, sample.getName)
+        if (sample.getParamTree().isEmpty) stmt.bindNull(2)
+        else stmt.bind(2, _xmlSerializer.serializeParamTree(sample.getParamTree().get))
+        stmt.step()
+        stmt.reset()
+      }
+    }
+    stmt.dispose()
+
     // --- INSERT SOFTWARE LIST --- //
-    stmt = _connection.prepare(s"INSERT INTO ${SoftwareTable.tableName} VALUES (NULL, ?, ?, ?, NULL)", false)
+    stmt = _connection.prepare(s"INSERT INTO ${SoftwareTable.tableName} VALUES (NULL, ?, ?, ?, NULL)", cached = false)
     val softwareList = metaData.getSoftwareList
     for (software <- softwareList) {
       stmt.bind(1, software.getName)
       stmt.bind(2, software.getVersion)
       // FIXME: software paramtree should be defined
-      if (software.getParamTree.isEmpty) stmt.bind(3, "")
-      else stmt.bind(3, _xmlSerializer.serializeParamTree(software.getParamTree.get))
-      stmt.step()
-      stmt.reset()
-    }
-    stmt.dispose()
-
-    // --- INSERT SOURCE FILES --- //
-    stmt = _connection.prepare(s"INSERT INTO ${SourceFileTable.tableName} VALUES (NULL, ?, ?, ?, NULL)", false)
-    val sourceFiles = metaData.getSourceFiles
-    for (sourceFile <- sourceFiles) {
-      stmt.bind(1, sourceFile.getName)
-      stmt.bind(2, sourceFile.getLocation)
-      // FIXME: source file paramtree should be defined
-      if (sourceFile.getParamTree.isEmpty) stmt.bind(3, "")
-      else stmt.bind(3, _xmlSerializer.serializeParamTree(sourceFile.getParamTree.get))
+      if (software.getParamTree().isEmpty) stmt.bind(3, "")
+      else stmt.bind(3, _xmlSerializer.serializeParamTree(software.getParamTree().get))
       stmt.step()
       stmt.reset()
     }

@@ -21,7 +21,7 @@ object MzDbTools extends AbstractMzDbTools  {
   private val nativeFiles = NATIVE_LIB_DIR.listFiles()
 
   // Configure QuickXml native library
-  private val quickxmlLibFileOpt = nativeFiles.find(_.getName == QuickXmlEnv.libraryFileName)
+  private lazy val quickxmlLibFileOpt = nativeFiles.find(_.getName == QuickXmlEnv.libraryFileName)
   if (quickxmlLibFileOpt.isDefined) {
     QuickXmlEnv.setLibraryPath(quickxmlLibFileOpt.get.getAbsolutePath)
   } else {
@@ -37,6 +37,11 @@ object MzDbTools extends AbstractMzDbTools  {
     } else {
       RawFileParserEnv.extractLibrary(Some(NATIVE_LIB_DIR))
     }
+  }
+
+  protected def getAssemblyDir(): File = {
+    // Return the current JAR directory
+    new File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile
   }
 
   @main
@@ -64,7 +69,7 @@ object MzDbTools extends AbstractMzDbTools  {
     if (isLinux) {
 
       // Retrieve current JAR directory
-      val jarDir = new File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile
+      val jarDir = getAssemblyDir()
 
       // Execute "chmod" and sends output to stdout
       import scala.sys.process._
@@ -99,7 +104,7 @@ object MzDbTools extends AbstractMzDbTools  {
       //TimsReaderLibrary.loadLibrary(new File(s"$NATIVE_LIB_DIR_PATH/libtimsdatareader.so").getAbsolutePath)
 
       // Retrieve current JAR directory
-      val jarDir = new File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile
+      val jarDir = getAssemblyDir()
 
       // Execute "chmod" and sends output to stdout
       import scala.sys.process._

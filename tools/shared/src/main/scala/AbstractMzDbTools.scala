@@ -11,8 +11,10 @@ import com.github.sqlite4s.{ISQLiteFactory, SQLiteFactory}
 
 abstract class AbstractMzDbTools extends Logging {
 
+  protected def getAssemblyDir(): File
+
   // Define the directory containing native libraries for JFFI and SQLite4Java
-  protected val NATIVE_LIB_DIR = new java.io.File("./lib").getAbsoluteFile.getCanonicalFile
+  protected val NATIVE_LIB_DIR = new File(getAssemblyDir(), "lib").getAbsoluteFile.getCanonicalFile
   protected val NATIVE_LIB_DIR_PATH = NATIVE_LIB_DIR.getAbsolutePath
 
   // Configure mzdb4s logging
@@ -128,8 +130,8 @@ abstract class AbstractMzDbTools extends Logging {
 
     logger.info("--- TDF to mzDB file converter ---")
 
-    require(new java.io.File(tdfDir).isDirectory, s"can't find a directory at: $tdfDir")
-    require(new java.io.File(tdfDir,"analysis.tdf").isFile, s"can't find an 'analysis.tdf' file in the directory: $tdfDir")
+    require(new File(tdfDir).isDirectory, s"can't find a directory at: $tdfDir")
+    require(new File(tdfDir,"analysis.tdf").isFile, s"can't find an 'analysis.tdf' file in the directory: $tdfDir")
 
     val mzDbFile = new File(mzDbPath)
     require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
