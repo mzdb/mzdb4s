@@ -194,7 +194,7 @@ object MzMLMetaDataParser {
           }
           case "sample" => {
             appendItemToList(
-              paramTree => Sample(sampleList.length + 1, attrsMap("name"), paramTree),
+              paramTree => Sample(sampleList.length + 1, "", paramTree),
               sampleList,
               sampleByRef
             )
@@ -304,8 +304,17 @@ object MzMLMetaDataParser {
           case "referenceableParamGroup" =>
             if (curAbstractParamTree == commonInstParamTree)
               fillParamTree = true
-          case "sample" =>
-            fillParamTree = true
+          case "sample" => {
+            fillAbstractParamTree()
+            val lastSample = sampleList.last
+            val sampleNameOpt = Option(curAbstractParamTree.getCVParam(PsiMsCV.SAMPLE_NUMBER)).orElse(
+              Option(curAbstractParamTree.getCVParam(PsiMsCV.SAMPLE_NAME))
+            ).map(_.getValue)
+
+            if (sampleNameOpt.isDefined) {
+              sampleList.last.name = sampleNameOpt.get
+            }
+          }
           case "software" =>
             fillParamTree = true
           case "source" =>

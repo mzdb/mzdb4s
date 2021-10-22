@@ -2,6 +2,7 @@ package com.github.mzdb4s.io.thermo
 
 import java.io.File
 
+import scala.scalanative.runtime.Platform
 import scala.scalanative.unsafe._
 
 import com.github.sqlite4s.c.util.CUtils
@@ -25,10 +26,18 @@ object RawFileParserWrapper extends IRawFileParserWrapper with com.github.mzdb4s
     val rawFileParserAbsDir = new File(rawFileParserDirectory).getCanonicalFile.getAbsolutePath.replace('\\', '/') + "/"
 
     Zone { implicit z =>
-      // Mono runtime location
-      bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(c"/usr/lib/")
+
+      val rawFileParserAbsDirAsCStr = CUtils.toCString(rawFileParserAbsDir)
+
       // C# DLL location
-      bindings.MonoEmbeddinator.mono_embeddinator_set_assembly_path(CUtils.toCString(rawFileParserAbsDir))
+      bindings.MonoEmbeddinator.mono_embeddinator_set_assembly_path(rawFileParserAbsDirAsCStr)
+
+      // Mono runtime location
+      if (Platform.isWindows) {
+        bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(rawFileParserAbsDirAsCStr)
+      } else {
+        bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(c"/usr/lib/")
+      }
     }
 
     _isInitialized = true

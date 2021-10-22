@@ -14,7 +14,7 @@ libyxml.a: yxml.c yxml.h
 	$(AR) rcs libyxml.a yxml.o
 
 libyxml.so: yxml.c yxml.h
-	$(CC) $(CFLAGS) -m64 -shared -I. -c yxml.c -o ../../lib/libyxml.so
+	$(CC) $(CFLAGS) -m64 -shared -I. -c yxml.c -o ../../nativelib/libyxml.so
 
 #test/test: libyxml.a test/test.c
 #	$(CC) $(CFLAGS) -I. test/test.c libyxml.a -o test/test

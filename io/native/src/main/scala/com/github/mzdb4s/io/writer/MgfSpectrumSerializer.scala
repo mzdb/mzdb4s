@@ -70,7 +70,7 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
     charge: Int,
     intensityCutoff: Option[Float],
     exportProlineTitle: Boolean
-  ): String = {
+  ): Array[Byte] = {
 
     spectrumStringBuilder.clear()
 
@@ -108,27 +108,10 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
     val ints = data.intensityList
     val intsLength = ints.length
 
-    @inline def appendPeak(mz: Double, intensity: Float): Unit = {
-      val mzCStr = stackalloc[CChar](24.toULong)
-      val mzStrLen = com.github.utils4sn.bindings.StrBuilderLib.dtoa(mz, mzCStr, mzFragDecimals)
-
-      //println("mzCStr: " + fromCString(mzCStr))
-      //assert(mzStrLen == 0, "mzStrLen: " + mzStrLen)
-
-      val intCStr = stackalloc[CChar](24.toULong)
-      val intStrLen = com.github.utils4sn.bindings.StrBuilderLib.ftoa(intensity, intCStr, 0)
-
-      spectrumStringBuilder
-        .addString(mzCStr, mzStrLen.toULong)
-        .addChar(32.asInstanceOf[CChar]) // add space
-        .addString(intCStr, intStrLen.toULong)
-        .addString(LINE_SEPARATOR_CSTR, LINE_SEPARATOR_LEN.toULong)
-    }
-
     if (intensityCutoff.isEmpty) {
       var i = 0
       while (i < intsLength) {
-        appendPeak(mzs(i), ints(i))
+        appendPeak(mzs(i), ints(i), mzFragDecimals)
         i += 1
       }
     } else {
@@ -137,7 +120,7 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
       while (i < intsLength) {
         val intensity = ints(i)
         if (intensity >= cutoff) {
-          appendPeak(mzs(i), intensity)
+          appendPeak(mzs(i), intensity, mzFragDecimals)
         }
         i += 1
       }
@@ -148,7 +131,32 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
       .addString(LINE_SEPARATOR_CSTR, LINE_SEPARATOR_LEN.toULong)
       .underlyingString()
 
-    fromCString(spectrumAsCStr)
+    //fromCString(spectrumAsCStr)
+
+    val bytes: Array[Byte] = com.github.sqlite4s.c.util.CUtils.bytes2ByteArray(
+      spectrumAsCStr,
+      scala.scalanative.libc.string.strlen(spectrumAsCStr)
+    )
+
+    bytes
+  }
+
+  @inline
+  def appendPeak(mz: Double, intensity: Float, mzFragDecimals: Int): Unit = {
+    val mzCStr = stackalloc[CChar](24.toULong)
+    val mzStrLen = com.github.utils4sn.bindings.StrBuilderLib.dtoa(mz, mzCStr, mzFragDecimals)
+
+    //println("mzCStr: " + fromCString(mzCStr))
+    //assert(mzStrLen == 0, "mzStrLen: " + mzStrLen)
+
+    val intCStr = stackalloc[CChar](24.toULong)
+    val intStrLen = com.github.utils4sn.bindings.StrBuilderLib.ftoa(intensity, intCStr, 0)
+
+    spectrumStringBuilder
+      .addString(mzCStr, mzStrLen.toULong)
+      .addChar(32.asInstanceOf[CChar]) // add space
+      .addString(intCStr, intStrLen.toULong)
+      .addString(LINE_SEPARATOR_CSTR, LINE_SEPARATOR_LEN.toULong)
   }
 
 }

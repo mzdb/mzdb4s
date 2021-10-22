@@ -11,7 +11,7 @@ import com.github.sqlite4s.{ISQLiteStatement, SQLiteQuery}
 class SQLiteRecord(val sqliteQuery: SQLiteQuery) extends AnyVal {
   private def stmt: ISQLiteStatement = sqliteQuery.getStatement
 
-  def getStatement: ISQLiteStatement = this.stmt
+  def getStatement(): ISQLiteStatement = this.stmt
 
   // TODO: replace calls to name().toLowerCase() by toString() ?
   def columnString(column: Enumeration#Value): String = this.columnString(column.toString)

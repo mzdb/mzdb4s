@@ -5,7 +5,13 @@ import scribe.filter._
 import scribe.output.format.ASCIIOutputFormat
 
 // Used to abstract Logging from used library
-trait Logging extends scribe.Logging
+trait Logging extends scribe.Logging {
+  @inline def canLogTrace: Boolean = LogLevel.TRACE <= Logging.MAX_LOG_LEVEL
+  @inline def canLogDebug: Boolean = LogLevel.DEBUG <= Logging.MAX_LOG_LEVEL
+  @inline def canLogInfo: Boolean = LogLevel.INFO <= Logging.MAX_LOG_LEVEL
+  @inline def canLogWarn: Boolean = LogLevel.WARN <= Logging.MAX_LOG_LEVEL
+  @inline def canLogError: Boolean = LogLevel.ERROR <= Logging.MAX_LOG_LEVEL
+}
 
 object Logging {
 
@@ -13,10 +19,12 @@ object Logging {
   val LogLevel = com.github.mzdb4s.LogLevel
 
   private val namespace = "com.github.mzdb4s"
+  private var MAX_LOG_LEVEL: LogLevel = LogLevel.DEBUG
 
   // Implementation of logger config function for scribe (https://github.com/outr/scribe/wiki/getting-started)
   // See: http://www.matthicks.com/2018/02/scribe-2-fastest-jvm-logger-in-world.html
   def configureLogger(minLogLevel: Logging.LogLevel = LogLevel.DEBUG): Unit = {
+    MAX_LOG_LEVEL = minLogLevel
 
     // set log level, e.g. to DEBUG
     val scribeMinLogLevelOpt = Option(minLogLevel match {
@@ -53,6 +61,7 @@ object Logging {
 sealed abstract class LogLevel {
   def value: Int
   @inline final def >=(other: LogLevel): Boolean = this.value >= other.value
+  @inline final def <=(other: LogLevel): Boolean = this.value <= other.value
 }
 
 object LogLevel  {

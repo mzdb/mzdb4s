@@ -47,7 +47,7 @@ class SQLiteQuery(
 
   def getColumnNames(): Seq[String] = this.resultDesc.getColumnNames()
 
-  def getStatement: ISQLiteStatement = stmt
+  def getStatement(): ISQLiteStatement = stmt
 
   def dispose(): Unit = if (! this.isStatementDisposed) {
     this.stmt.dispose()

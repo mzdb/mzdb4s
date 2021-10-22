@@ -5,11 +5,12 @@ import scala.scalanative.posix.time
 import scala.scalanative.libc.string
 import scala.scalanative.unsigned.UnsignedRichInt
 
-// FIXME: use time.strptime when available in the SN library that we use
+/*
+// Note: was used when time.strptime was not available in the SN library
 @extern
 private object time_ext {
   def strptime(str: Ptr[CChar], format: CString, time: Ptr[scala.scalanative.posix.time.tm]): CString = extern
-}
+}*/
 
 /*
 object timeOps {
@@ -47,17 +48,27 @@ object timeOps {
 object DateParser {
 
   def parseIsoDate(dateStr: String): java.util.Date = {
+
     val tm_ptr = stackalloc[time.tm]
 
     string.memset(tm_ptr.asInstanceOf[Ptr[Byte]], 0, sizeof[time.time_t])
 
-    scala.scalanative.unsafe.Zone { implicit z =>
+    val timeSinceEpoch = scala.scalanative.unsafe.Zone { implicit z =>
       // FIXME: calling CUtils.toCString doesn't work anymore in SN v0.4
       //time_ext.strptime(CUtils.toCString(dateStr), c"%Y-%m-%dT%H:%M:%SZ", tm_ptr) //"yyyy-MM-dd'T'HH:mm:ss'Z'"
-      time_ext.strptime(toCString(dateStr)(z), c"%Y-%m-%dT%H:%M:%SZ", tm_ptr) //"yyyy-MM-dd'T'HH:mm:ss'Z'"
-    }
 
-    val timeSinceEpoch = time.mktime(tm_ptr).asInstanceOf[time.time_t]
+      val isoDateAsCStr = toCString(dateStr)(z)
+      val format = c"%Y-%m-%dT%H:%M:%SZ" //"yyyy-MM-dd'T'HH:mm:ss'Z'"
+
+      // Workaround for missing support of strptime on Windows
+      if (scalanative.meta.LinktimeInfo.isWindows) {
+        com.github.utils4sn.bindings.StrptimeLib.strptime(isoDateAsCStr, format, tm_ptr)
+        time.mktime(tm_ptr)
+      } else {
+        time.strptime(isoDateAsCStr, format, tm_ptr)
+        time.mktime(tm_ptr)
+      }
+    }
 
     new java.util.Date(timeSinceEpoch * 1000)
   }
@@ -68,7 +79,7 @@ object DateParser {
 
     Zone { implicit z =>
       val time_ptr = alloc[time.time_t]
-      time_ptr.update(0, date.getTime / 1000)
+      time_ptr.update(0.toUInt, date.getTime / 1000)
 
       val timePtr                = time.localtime(time_ptr)
       val isoDatePtr: Ptr[CChar] = alloc[CChar](DATE_SIZE)

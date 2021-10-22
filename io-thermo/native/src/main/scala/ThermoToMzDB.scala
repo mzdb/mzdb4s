@@ -23,8 +23,8 @@ object ThermoToMzDB {
   implicit val sf: ISQLiteFactory = SQLiteFactory
 
   private def readLink(link: CString)(implicit z: Zone): CString = {
-    val buffer: CString = alloc[Byte](limits.PATH_MAX.toUInt)
-    readlink(link, buffer, (limits.PATH_MAX - 1).toUInt) match {
+    val buffer: CString = alloc[Byte](limits.PATH_MAX)
+    readlink(link, buffer, limits.PATH_MAX - 1.toUInt) match {
       case -1 =>
         null
       case read =>

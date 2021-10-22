@@ -95,7 +95,7 @@ abstract class AbstractSpectrumHeaderReader(
 
     _spectrumHeaderExtractor = new Object() with ISQLiteRecordExtraction[SpectrumHeader] {
       def extractRecord(record: SQLiteRecord): SpectrumHeader = {
-        val stmt = record.getStatement
+        val stmt = record.getStatement()
         val msLevel = stmt.columnInt(SpectrumHeaderColIdx.msLevel)
         val activationTypeOpt = if (msLevel == 1) None
         else {
@@ -149,6 +149,10 @@ abstract class AbstractSpectrumHeaderReader(
     _spectrumHeaderExtractor
   }
 
+  /*private def _extractRecord(stmt: com.github.sqlite4s.ISQLiteStatement, paramTreeParser: com.github.mzdb4s.io.reader.param.IParamTreeParser): SpectrumHeader = { // (implicit mzDbCtx: MzDbContext)
+
+  }*/
+
   private def _loadSpectrumHeaders(msLevel: Int, queryStr: String)(implicit mzDbCtx: MzDbContext): Array[SpectrumHeader] = {
     val spectraCount = MzDbReaderQueries.getSpectraCount(msLevel)
     val spectrumHeaders = new Array[SpectrumHeader](spectraCount)
@@ -168,15 +172,14 @@ abstract class AbstractSpectrumHeaderReader(
   protected def getSpectrumHeaders()(implicit mzDbCtx: MzDbContext): Array[SpectrumHeader] = {
     if (this.entityCache.nonEmpty && entityCacheOrNull.spectrumHeaders != null) this.entityCacheOrNull.spectrumHeaders
     else {
-      val ms1SpectrumHeaders = this.getMs1SpectrumHeaders()
-      val ms2SpectrumHeaders = this.getMs2SpectrumHeaders()
-      val ms3SpectrumHeaders = this.getMs3SpectrumHeaders()
-      val spectraCount = ms1SpectrumHeaders.length + ms2SpectrumHeaders.length + ms3SpectrumHeaders.length
+      val spectraCount = MzDbReaderQueries.getSpectraCount()
       val spectrumHeaders = new Array[SpectrumHeader](spectraCount)
-      System.arraycopy(ms1SpectrumHeaders, 0, spectrumHeaders, 0, ms1SpectrumHeaders.length)
-      System.arraycopy(ms2SpectrumHeaders, 0, spectrumHeaders, ms1SpectrumHeaders.length, ms2SpectrumHeaders.length)
-      System.arraycopy(ms3SpectrumHeaders, 0, spectrumHeaders, ms1SpectrumHeaders.length + ms2SpectrumHeaders.length, ms3SpectrumHeaders.length)
+
+      mzDbCtx.newSQLiteQuery(_spectrumHeaderQueryStr).extractRecords(this._getSpectrumHeaderExtractor(), spectrumHeaders)
+
+
       if (this.entityCache.nonEmpty) this.entityCacheOrNull.spectrumHeaders = spectrumHeaders
+
       spectrumHeaders
     }
   }
@@ -191,12 +194,19 @@ abstract class AbstractSpectrumHeaderReader(
   }
 
   protected def getMs1SpectrumHeaders()(implicit mzDbCtx: MzDbContext): Array[SpectrumHeader] = {
-    if (this.entityCache.nonEmpty && this.entityCacheOrNull.ms1SpectrumHeaders != null) this.entityCacheOrNull.ms1SpectrumHeaders
-    else {
-      val ms1SpectrumHeaders = _loadSpectrumHeaders(1, AbstractSpectrumHeaderReader._ms1SpectrumHeaderQueryStr)
-      if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms1SpectrumHeaders = ms1SpectrumHeaders
-      ms1SpectrumHeaders
+    if (this.entityCache.nonEmpty) {
+      if (this.entityCacheOrNull.ms1SpectrumHeaders != null) {
+        return this.entityCacheOrNull.ms1SpectrumHeaders
+      } else if (this.entityCacheOrNull.spectrumHeaders != null) {
+        val ms1SpectrumHeaders = this.entityCacheOrNull.spectrumHeaders.filter(_.msLevel == 1)
+        this.entityCacheOrNull.ms1SpectrumHeaders = ms1SpectrumHeaders
+        return ms1SpectrumHeaders
+      }
     }
+
+    val ms1SpectrumHeaders = _loadSpectrumHeaders(1, AbstractSpectrumHeaderReader._ms1SpectrumHeaderQueryStr)
+    if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms1SpectrumHeaders = ms1SpectrumHeaders
+    ms1SpectrumHeaders
   }
 
   def getMs1SpectrumHeaderById()(implicit mzDbCtx: MzDbContext): LongMap[SpectrumHeader] = {
@@ -209,12 +219,19 @@ abstract class AbstractSpectrumHeaderReader(
   }
 
   protected def getMs2SpectrumHeaders()(implicit mzDbCtx: MzDbContext): Array[SpectrumHeader] = {
-    if (this.entityCache.nonEmpty && this.entityCacheOrNull.ms2SpectrumHeaders != null) this.entityCacheOrNull.ms2SpectrumHeaders
-    else {
-      val ms2SpectrumHeaders = _loadSpectrumHeaders(2, AbstractSpectrumHeaderReader._ms2SpectrumHeaderQueryStr)
-      if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms2SpectrumHeaders = ms2SpectrumHeaders
-      ms2SpectrumHeaders
+    if (this.entityCache.nonEmpty) {
+      if (this.entityCacheOrNull.ms2SpectrumHeaders != null) {
+        return this.entityCacheOrNull.ms2SpectrumHeaders
+      } else if (this.entityCacheOrNull.spectrumHeaders != null) {
+        val ms2SpectrumHeaders = this.entityCacheOrNull.spectrumHeaders.filter(_.msLevel == 2)
+        this.entityCacheOrNull.ms2SpectrumHeaders = ms2SpectrumHeaders
+        return ms2SpectrumHeaders
+      }
     }
+
+    val ms2SpectrumHeaders = _loadSpectrumHeaders(2, AbstractSpectrumHeaderReader._ms2SpectrumHeaderQueryStr)
+    if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms2SpectrumHeaders = ms2SpectrumHeaders
+    ms2SpectrumHeaders
   }
 
   def getMs2SpectrumHeaderById()(implicit mzDbCtx: MzDbContext): LongMap[SpectrumHeader] = {
@@ -227,12 +244,19 @@ abstract class AbstractSpectrumHeaderReader(
   }
 
   protected def getMs3SpectrumHeaders()(implicit mzDbCtx: MzDbContext): Array[SpectrumHeader] = {
-    if (this.entityCache.nonEmpty && this.entityCacheOrNull.ms3SpectrumHeaders != null) this.entityCacheOrNull.ms3SpectrumHeaders
-    else {
-      val ms3SpectrumHeaders = _loadSpectrumHeaders(3, AbstractSpectrumHeaderReader._ms3SpectrumHeaderQueryStr)
-      if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms3SpectrumHeaders = ms3SpectrumHeaders
-      ms3SpectrumHeaders
+    if (this.entityCache.nonEmpty) {
+      if (this.entityCacheOrNull.ms3SpectrumHeaders != null) {
+        return this.entityCacheOrNull.ms3SpectrumHeaders
+      } else if (this.entityCacheOrNull.spectrumHeaders != null) {
+        val ms3SpectrumHeaders = this.entityCacheOrNull.spectrumHeaders.filter(_.msLevel == 3)
+        this.entityCacheOrNull.ms3SpectrumHeaders = ms3SpectrumHeaders
+        return ms3SpectrumHeaders
+      }
     }
+
+    val ms3SpectrumHeaders = _loadSpectrumHeaders(3, AbstractSpectrumHeaderReader._ms3SpectrumHeaderQueryStr)
+    if (this.entityCache.nonEmpty) this.entityCacheOrNull.ms3SpectrumHeaders = ms3SpectrumHeaders
+    ms3SpectrumHeaders
   }
 
   def getMs3SpectrumHeaderById()(implicit mzDbCtx: MzDbContext): LongMap[SpectrumHeader] = {

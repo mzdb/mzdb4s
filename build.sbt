@@ -1,19 +1,20 @@
 import scala.language.postfixOps
 import scala.sys.process._
 
-lazy val scala213 = "2.13.5"
-lazy val scala211 = "2.11.12"
-lazy val supportedScalaVersions = List(scala211, scala213)
+lazy val scala213 = "2.13.6"
+//lazy val scala211 = "2.11.12"
+//lazy val supportedScalaVersions = List(scala211, scala213)
+lazy val supportedScalaVersions = List(scala213)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.2",
+  version := "0.4.3",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
   libraryDependencies ++= Seq(
-    "com.outr" %%% "scribe" % "3.3.3",
-    "com.lihaoyi" %%% "utest" % "0.7.7" % Test
+    "com.outr" %%% "scribe" % "3.6.1",
+    "com.lihaoyi" %%% "utest" % "0.7.10" % Test
   ),
 
   testFrameworks += new TestFramework("utest.runner.Framework")
@@ -34,8 +35,8 @@ val sharedJvmSettings = Seq(
 val sharedNativeSettings = Seq(
   // Set to false or remove if you want to show stubs as linking errors
   nativeLinkStubs := true,
-  nativeMode := "debug", //"debug", //"release-fast", //"release",
-  nativeLTO := "none",   // "none","thin" // note: thin doesn't work when Rust static libraries are linked
+  nativeMode := "release-fast", //"debug", //"release-fast", //"release",
+  nativeLTO := "thin",   // "none","thin" // note: thin doesn't work when Rust static libraries are linked
   nativeGC := "immix"    // "none","boehm","commix","immix"
 )
 
@@ -55,8 +56,7 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(
     sharedJvmSettings ++ Seq(
       libraryDependencies ++= Seq(
-        "com.github.jnr" % "jffi" % "1.3.2",
-        "com.github.jnr" % "jnr-ffi" % "2.2.2",
+        "com.github.jnr" % "jnr-ffi" % "2.2.7",
         "com.almworks.sqlite4java" % "sqlite4java" % "1.0.392",
 
         // OS dependant SQLite library dependency
@@ -77,7 +77,7 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
       nativeMode := "debug",
 
       libraryDependencies ++= Seq(
-        "com.github.david-bouyssie" %%% "sqlite4s" % "0.4.0"
+        "com.github.david-bouyssie" %%% "sqlite4s" % "0.4.1"
       )
     ),
 
@@ -100,11 +100,8 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
 
     sharedNativeSettings ++ Seq(
 
-      /*libraryDependencies ++= Seq(
-        "com.lihaoyi" %%% "utest" % "0.7.7" % Test
-      ),*/
-
-      nativeMode := "release-fast",
+      nativeLTO := "thin",
+      nativeMode := "release-fast", //"debug",
 
       // Link custom native libraries
       nativeLinkingOptions ++= Seq(
@@ -117,7 +114,7 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
 
       // Add the lib folder to the cleanFiles list (issue: the lib folder itself is deleted)
       // See: https://stackoverflow.com/questions/10471596/add-additional-directory-to-clean-task-in-sbt-build
-      cleanFiles += baseDirectory.value / "nativelib",
+      //cleanFiles += baseDirectory.value / "nativelib",
 
       // Configure the task which will build native libraries from C source code
       // See:
@@ -169,13 +166,9 @@ lazy val mzdb4sThermo = crossProject(JVMPlatform, NativePlatform)
   .nativeSettings(
     sharedNativeSettings ++ Seq(
 
-      /*libraryDependencies ++= Seq(
-        "com.lihaoyi" %%% "utest" % "0.7.4" % Test
-      )*/
-
       //mainClass in Compile := Some("ThermoToMzDb"),
 
-      nativeMode := "debug", //"debug", //"release-fast"
+      nativeMode := "release-fast", //"debug", //"release-fast"
 
       // Replace the default "lib" folder by "jars", so that we can use "lib" for native libraries
       //unmanagedBase := baseDirectory.value / "jars",
@@ -219,6 +212,8 @@ lazy val mzdb4sTimsData = crossProject(JVMPlatform, NativePlatform)
       // FIXME: on Linux we also have to do before execution
       // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
       nativeLinkingOptions ++= Seq(
+        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
       )
     )
@@ -306,16 +301,22 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
     sharedNativeSettings ++ Seq(
 
       nativeMode := "release-fast", //"debug", //"release-fast"
+      //nativeLTO := "thin",
+
+      //nativeCompileOptions ++= Seq("-Ofast","-Wa,/Ox"),
+      //nativeCompileOptions ++= Seq("-O2","-Wa,/O2"),
 
       // Link custom native libraries
       // FIXME: on Linux we also have to do before execution
       // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/:/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
+      // TODO on Windows: copy DLL files from nativelib to the target directories
+      // See: https://stackoverflow.com/questions/36237174/how-to-copy-some-files-to-the-build-target-directory-with-sbt
       nativeLinkingOptions ++= Seq(
         "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.in(mzdb4sThermo_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-L" ++ baseDirectory.in(mzdb4sTimsData_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-Wl,-allow-multiple-definition"
+        "-L" ++ baseDirectory.in(mzdb4sTimsData_Native).value.getAbsolutePath() ++ "/nativelib"
+        //"-Wl,-allow-multiple-definition" // was used to solve conflicts regarding duplicated code definitions introduced by static libraries
       )
     )
   )
@@ -375,15 +376,9 @@ lazy val sqlite4javaWin64Lib = file(sqlite4javaDir + "/sqlite4java-win32-x64/dll
 lazy val sqlite4javaLinuxLib = file(sqlite4javaDir + "/libsqlite4java-linux-amd64/sos/libsqlite4java-linux-amd64-1.0.392.so")
 
 lazy val localSqlite4javaWin64Lib = file("./") / "sqlite4java-win32-x64-1.0.392.dll"
-//lazy val localSqlite4javaLinuxDir = file("./") //file("/usr/java/packages/lib/amd64")
 lazy val localSqlite4javaLinuxLib = file("./") / "libsqlite4java-linux-amd64-1.0.392.so"
 
 val osName = sys.props("os.name")
 val copySqlite4javaWin64Lib = if (osName.startsWith("Windows") && !localSqlite4javaWin64Lib.exists ) IO.copyFile( sqlite4javaWin64Lib, localSqlite4javaWin64Lib )
 val copySqlite4javaLinuxLib = if (osName.startsWith("Linux") && !localSqlite4javaLinuxLib.exists) IO.copyFile( sqlite4javaLinuxLib, localSqlite4javaLinuxLib )
-/*{
-  //file("/usr/java/packages/lib/amd64").mkdirs()
-  System.setProperty("sqlite4java.library.path", "./")
-  IO.copyFile( sqlite4javaLinuxLib, localSqlite4javaLinuxLib )
-}*/
 

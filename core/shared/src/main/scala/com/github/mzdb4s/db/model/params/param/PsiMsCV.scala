@@ -16,8 +16,16 @@ object PsiMsCV extends Enumeration {
   val ISOLATION_WINDOW_LOWER_OFFSET = Term("MS:1000828")
   val ISOLATION_WINDOW_UPPER_OFFSET = Term("MS:1000829")
   val MS_LEVEL = Term("MS:1000511")
+  val SAMPLE_NAME = Term("MS:1000002")
+  val SAMPLE_NUMBER = Term("MS:1000001")
   val SCAN_START_TIME = Term("MS:1000016")
   val SELECTED_ION_MZ = Term("MS:1000744")
+
+  val CID = Term("MS:1000133")
+  val ETD = Term("MS:1000598")
+  val ETHCD = Term("MS:1002631")
+  val HCD = Term("MS:1000422")
+  val PSD = Term("MS:1000135")
 }
 
 /*object CVEntry extends Enumeration {

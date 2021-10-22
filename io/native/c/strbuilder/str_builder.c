@@ -185,7 +185,7 @@ char *str_builder_dump(const str_builder_t *sb, size_t *len)
 //#include <stdio.h>
 
 // Reverses a string 'str' of length 'len'
-void reverse(char* str, int len)
+void _mzdb4s_reverse(char* str, int len)
 {
     int i = 0, j = len - 1, temp;
     while (i < j) {
@@ -198,7 +198,7 @@ void reverse(char* str, int len)
 }
 
 // Implementation of itoa()
-int itoa(int n, char s[])
+int _mzdb4s_itoa(int n, char s[])
 {
     int i, sign;
 
@@ -214,7 +214,7 @@ int itoa(int n, char s[])
     if (sign < 0)
         s[i++] = '-';
 
-    reverse(s, i);
+    _mzdb4s_reverse(s, i);
     s[i] = '\0';
 
     return i;
@@ -223,7 +223,7 @@ int itoa(int n, char s[])
 // Converts a given fractional part fp to string str[].
 // d is the number of digits required in the output.
 // If d is more than the number of digits in x, then 0s are added at the beginning.
-int fptoa(int fp, char str[], int d)
+int _mzdb4s_fptoa(int fp, char str[], int d)
 {
     if (fp == 0) {
         str[0] = '0';
@@ -248,7 +248,7 @@ int fptoa(int fp, char str[], int d)
     while (i < d)
         str[i++] = '0';
 
-    reverse(str, i);
+    _mzdb4s_reverse(str, i);
 
     str[i] = '\0';
 
@@ -260,7 +260,7 @@ int dtoa(double v, char* res, int places)
 {
     // If no decimal places expected then treat value as integer
     if (places == 0) {
-        return itoa((int)round(v), res);
+        return _mzdb4s_itoa((int)round(v), res);
     }
 
     // Extract integer part
@@ -279,7 +279,7 @@ int dtoa(double v, char* res, int places)
         ipart += 1;
 
     // Convert integer part to string
-    int ilen = itoa(ipart, res);
+    int ilen = _mzdb4s_itoa(ipart, res);
 
     res[ilen] = '.'; // add dot
 
@@ -291,7 +291,7 @@ int dtoa(double v, char* res, int places)
     }
 
     // The places parameter is needed to handle cases like 233.007
-    int fplen = fptoa(rfpart, res + ilen + 1, places);
+    int fplen = _mzdb4s_fptoa(rfpart, res + ilen + 1, places);
 
     return ilen + 1 + fplen;
 }
@@ -301,7 +301,7 @@ int ftoa(float v, char* res, int places)
 {
     // If no decimal places expected then treat value as integer
     if (places == 0) {
-        return itoa((int)round(v), res);
+        return _mzdb4s_itoa((int)round(v), res);
     }
 
     // We fallback to double representation to be closer to JVM outputs

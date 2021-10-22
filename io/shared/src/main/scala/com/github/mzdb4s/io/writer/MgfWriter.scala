@@ -409,8 +409,10 @@ class MgfWriter(
     var precsNotFoundCount = 0
 
     // Create MGF writer and mzDB reader
-    val mgfWriter = new PrintWriter(new BufferedWriter(new FileWriter(mgfFile)))
     val mzDbReader = new MzDbReader(this.mzDBFilePath, true)
+
+    val bufferSize = 4 * 1024 * 1024 // 4 MB buffer
+    val mgfWriter = new BufferedOutputStream(new FileOutputStream(mgfFile), bufferSize)
 
     try {
       // Configure the mzDbReader in order to load all precursor lists and all scan list when reading spectra headers
@@ -425,9 +427,7 @@ class MgfWriter(
       }
 
       // Iterate MSn spectra
-      //println("before get iterator")
       val spectrumIterator = mzDbReader.getSpectrumIterator(2)
-      //println("after get iterator")
 
       val dataEncodingBySpectrumId = mzDbReader.getDataEncodingBySpectrumId()
 
@@ -442,7 +442,8 @@ class MgfWriter(
         val precMzOpt = precEstimator.getPrecursorMz(mzDbReader, spectrumHeader)
         val precMz = if (precMzOpt.isDefined) precMzOpt.get
         else {
-          logger.trace(s"precursor m/z could not be estimated using method (${precEstimator.getMethodName()}): falling back to default method")
+          if (canLogTrace) logger.trace(s"precursor m/z could not be estimated using method (${precEstimator.getMethodName()}): falling back to default method")
+
           val mzOpt = MgfWriter.DefaultPrecursorEstimator.getPrecursorMz(mzDbReader, spectrumHeader)
           if (mzOpt.isDefined && mzOpt.get > 0.0) mzOpt.get
           else {
@@ -451,7 +452,7 @@ class MgfWriter(
           }
         }
 
-        val spectrumAsStr = spectrumSerializer.stringifySpectrum(
+        val spectrumAsBytes = spectrumSerializer.stringifySpectrum(
           mzDBFilePath,
           mzDbReader,
           s,
@@ -465,12 +466,14 @@ class MgfWriter(
         //this.logger.debug("Writing spectrum with ID="+spectrumId);
 
         // Write the spectrum
-        mgfWriter.println(spectrumAsStr)
+        mgfWriter.write(spectrumAsBytes)
 
         spectraCount += 1
 
-        if (spectraCount % 1000 == 0)
-          mgfWriter.flush()
+
+        if (spectraCount % 10000 == 0) {
+          logger.debug(s"Processed $spectraCount spectra...")
+        }
       }
 
       this.logger.info(s"MGF file successfully created: $spectraCount spectra exported")

@@ -30,7 +30,7 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
     charge: Int,
     intensityCutoff: Option[Float],
     exportProlineTitle: Boolean
-  ): String = {
+  ): Array[Byte] = {
 
     spectrumStringBuilder.clear()
 
@@ -97,7 +97,7 @@ class MgfSpectrumSerializer() extends AbstractMgfSpectrumSerializer {
 
     spectrumStringBuilder.append(MgfField.END_IONS)
     spectrumStringBuilder.append(MgfWriter.LINE_SEPARATOR)
-    spectrumStringBuilder.toString
+    spectrumStringBuilder.toString.getBytes()
   }
 
 }

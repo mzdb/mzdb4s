@@ -8,9 +8,10 @@ object MzDbTools extends AbstractMzDbTools {
   import scala.scalanative.posix.unistd.readlink
   import scala.scalanative.unsafe._
   import scala.scalanative.unsigned._
+
   private def _readLink(link: CString)(implicit z: Zone): CString = {
-    val buffer: CString = alloc[Byte](limits.PATH_MAX.toUInt)
-    readlink(link, buffer, (limits.PATH_MAX - 1).toUInt) match {
+    val buffer: CString = alloc[Byte](limits.PATH_MAX)
+    readlink(link, buffer, limits.PATH_MAX - 1.toUInt) match {
       case -1 =>
         null
       case read =>
@@ -20,14 +21,20 @@ object MzDbTools extends AbstractMzDbTools {
     }
   }
 
-  // FIXME: we will need a different solution on windows
   // See: https://stackoverflow.com/questions/4517425/how-to-get-program-path/10734140#10734140
   protected def getAssemblyDir(): File = {
-    Zone { implicit z =>
-      val path = _readLink(c"/proc/self/exe")
-      require(path != null, "can't determine executable location")
-      new File(fromCString(path))
+    if (scalanative.meta.LinktimeInfo.isWindows) {
+      val dir = new File(WinApiHelper.getProgramLocation()).getParentFile
+      dir
     }
+    else {
+      Zone { implicit z =>
+        val path = _readLink(c"/proc/self/exe")
+        require(path != null, "can't determine executable location")
+        new File(fromCString(path))
+      }
+    }
+
   }
 
   @main
@@ -45,9 +52,11 @@ object MzDbTools extends AbstractMzDbTools {
     @arg(short = 'i', doc = "Path to the raw input file")
     raw: String,
     @arg(short = 'o', name = "mzdb", doc = "Path to the mzDB output file")
-    mzdbOpt: Option[String]
+    mzdbOpt: Option[String],
+    @arg(short = 's', name = "split-faims", doc = "Split RAW file in multiple mzDB files (for each FAIMS CV value)")
+    splitFaims: Flag
   ): Unit = {
-    this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"))
+    this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"),splitFaims.value)
   }
 
   @main

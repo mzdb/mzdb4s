@@ -77,48 +77,17 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
   // TODO: remove this limitation in the future, for now we modify a bit the RT using a small epsilon
   //private val RT_EPSILON = 0.05f
 
-  /*val noneOp: Option[_] = None
-
-  //For all Spectra Index, map to associated Frame Index
-  private var m_spectra2FrameIndex = null
-  //Memorize first Spectra Index for each Frame (index)
-  private var m_frame2FirstSpectraIndex = null
-  private var m_frame2ReadSpectraCount = null
-  private var m_frameById = null
-  private var m_precursorByIds = null
-   */
-
-  /*private def closeFile(): Unit = {
-    m_ttReader.closeTimstofFile(m_fileHdl)
-  }*/
-
-  /*private def initFramesData(): Unit = {
-    val start = System.currentTimeMillis
-    //Read TimsFrames with associated MetaData
-    val frames = m_ttReader.getFullTimsFrames(m_fileHdl)
-    Collections.sort(frames)
-    //Init indexes map
-    var spectrumIndex = 1
-    m_spectra2FrameIndex = new Nothing
-    m_frame2FirstSpectraIndex = new Nothing(frames.size * 4 / 3 + 1)
-    m_frameById = new Nothing(frames.size * 4 / 3 + 1)
-    import scala.collection.JavaConversions._
-    for (tf <- frames) {
-      val nbrSpectrum = tf.getSpectrumCount //VDS TODO For now 1 spectrum for MS ==> May have one per scans groups!!
-      m_frame2FirstSpectraIndex.put(tf.getId, spectrumIndex)
-      for (i <- 0 until nbrSpectrum) {
-        m_spectra2FrameIndex.put(spectrumIndex, tf.getId)
-        spectrumIndex += 1
-      }
-      m_frameById.put(tf.getId, tf)
-    }
-    m_frame2ReadSpectraCount = new Nothing(frames.size * 4 / 3 + 1)
-    m_precursorByIds = m_ttReader.getPrecursorInfoById(m_fileHdl)
-    val end = System.currentTimeMillis
-    logger.info("Read meta data for " + frames.size + " frames and " + m_spectra2FrameIndex.size + " spectrum. Duration : " + (end - start) + " ms")
-  }*/
+  // Sort spectra by increasing RT
+  private val _spectraQueue = scala.collection.mutable.PriorityQueue[Spectrum]()(Ordering.by[Spectrum, Float](_.header.time).reverse)
+  private var _queueLastSpectrumId = 0
+  private var _queueLastCycle = 0
+  private val _SPECTRA_QUEUE_MIN_SIZE = 100
 
   def convert(): Unit = {
+
+    _spectraQueue.clear()
+    _queueLastSpectrumId = 0
+    _queueLastCycle = 0
 
     val ms2MzTolPPM = 50
 
@@ -167,6 +136,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
           }
           */
 
+          // FIXME: in older Tims MGF files the RAWSCANS field is absent => we should implement a fallback
           val rawScansStr = spectrum.mgfHeader.entries.find(_.field == MgfField.RAWSCANS).get.value.toString
           val rawScansStrLen = rawScansStr.length
 
@@ -259,7 +229,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
           initialId = spId,
           title = title,
           cycle = cycle,
-          time = time,//frameRT + (firstScan.toFloat / 10000), // TODO: adjust me
+          time = time,
           msLevel = 2,
           activationType = Some(ActivationType.CID), // FIXME: check if correct
           peaksCount = mzValues.length,
@@ -461,34 +431,6 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
 
                 Some(specHeader)
               }
-              /*val mzDbPrec = new Precursor(spectrumTitle)
-
-              if (mgfFileExists && writtenPrecById.contains(precId)) {
-                None
-              }
-              else {
-                if (mgfFileExists)
-                  writtenPrecById.put(precId, true)
-
-                Some(SpectrumHeader(
-                  id = spId,
-                  initialId = spId,
-                  title = spectrumTitle,
-                  cycle = cycle,
-                  time = frameRT + (firstScan.toFloat / 10000), // TODO: adjust me
-                  msLevel = 2,
-                  activationType = Some(ActivationType.CID), // FIXME: check if correct
-                  peaksCount = peaksCount,
-                  isHighResolution = true,
-                  tic = intensityValues.sum,
-                  basePeakMz = basedPeakMz,
-                  basePeakIntensity = maxIntensity,
-                  precursorMz = precMzOpt.orElse(Some(prec.mz)),
-                  precursorCharge = precChargeOpt.orElse(prec.charge),
-                  spId,
-                  precursor = mzDbPrec
-                ))
-              }*/
             }
             case _ =>
 
@@ -518,6 +460,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
 
               val specHeader = _createPasefSpectrumHeader(
                 title = mgfSpectrum._1,
+                //time = frameRT + (1f + tmpIdx.toFloat) / 10000, // TODO: adjust me
                 time = mgfSpectrum._4 + (tmpIdx.toFloat / 1000), // TODO: adjust me
                 mzValues = mzValues,
                 intensityValues = intensityValues,
@@ -533,6 +476,11 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
         } // ends if (mgfFileExists && frame.msType == MS)
 
       }) // ends forEachMergedSpectrum
+
+      // Dequeue the remaining list of cached and re-ordered spectra
+      while (_spectraQueue.nonEmpty) {
+        _dequeueSpectrum(writer)
+      }
 
     } finally {
       if (writer != null) {
@@ -567,19 +515,43 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
   }
 
   def _insertSpectrum(writer: MzDbWriter, sh: SpectrumHeader, mzValues: Array[Double], intensityValues: Array[Float]): Unit = {
-    val spId = sh.id
+
     val spData = new SpectrumData(mzValues, intensityValues)
-
     val mzdb4sSp = Spectrum(sh, spData)
-    val spectrumMetaData = SpectrumXmlMetaData(spId, "", "", None, None)
 
-    writer.insertSpectrum(mzdb4sSp, spectrumMetaData, centroidDataEncoding)
+    _spectraQueue += mzdb4sSp
+
+    if (_spectraQueue.length >= _SPECTRA_QUEUE_MIN_SIZE) {
+      _dequeueSpectrum(writer)
+    }
+  }
+
+  private def _dequeueSpectrum(writer: MzDbWriter): Unit = {
+    val cachedSp = _spectraQueue.dequeue()
+
+    _queueLastSpectrumId += 1
+    if (cachedSp.header.msLevel == 1) {
+      _queueLastCycle += 1
+    }
+
+    val spId = _queueLastSpectrumId
+
+    // Update the ID, initial ID and cycle properties
+    val clonedSp = cachedSp.copy(
+      header = cachedSp.header.copy(
+        id = spId,
+        initialId = spId,
+        cycle = _queueLastCycle
+      )
+    )
+
+    val spectrumMetaData = SpectrumXmlMetaData(spId, "", "", None, None)
+    writer.insertSpectrum(clonedSp, spectrumMetaData, centroidDataEncoding)
 
     if (spId % 1000 == 0) {
       logger.debug(s"Processed $spId spectra...")
     }
   }
-
 
   /*
   private def fillmzDBPrecursor(mzdbPrecursor: Nothing, timstofPrecursor: Nothing, collEnergy: String): Unit = {

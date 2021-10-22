@@ -1,4 +1,5 @@
 import java.io.File
+import scala.collection.mutable.ListBuffer
 import mainargs._
 import quickxml.QuickXmlEnv
 import com.github.mzdb4s.io.thermo.RawFileParserEnv
@@ -59,7 +60,9 @@ object MzDbTools extends AbstractMzDbTools  {
     @arg(short = 'i', doc = "Path to the raw input file")
     raw: String,
     @arg(short = 'o', name = "mzdb", doc = "Path to the mzDB output file")
-    mzdbOpt: Option[String]
+    mzdbOpt: Option[String],
+    @arg(short = 's', name = "split-faims", doc = "Split RAW file in multiple mzDB files (for each FAIMS CV value)")
+    splitFaims: Flag
   ): Unit = {
 
     _checkRawFileParseLib()
@@ -79,13 +82,14 @@ object MzDbTools extends AbstractMzDbTools  {
       var ldLibPath = scala.util.Properties.envOrElse("LD_LIBRARY_PATH", "")
       ldLibPath = if (ldLibPath.isEmpty) NATIVE_LIB_DIR_PATH else s"$ldLibPath:$NATIVE_LIB_DIR_PATH"
 
-      // Execute mzdbtools
-      val command = if (mzdbOpt.isEmpty) List(s"$jarDir/mzdbtools","thermo2mzdb","-i",raw)
-      else List(s"$jarDir/mzdbtools","thermo2mzdb","-i",raw,"-o",mzdbOpt.get)
+      // Create the list of command arguments
+      val commandArgs = ListBuffer(s"$jarDir/mzdbtools","thermo2mzdb","-i",raw,"-o",mzdbOpt.getOrElse(raw + ".mzDB"))
+      if (splitFaims.value) commandArgs += "--split-faims"
 
-      Process(command.mkString(" "),None,("LD_LIBRARY_PATH",ldLibPath)).!
+      // Execute mzdbtools
+      Process(commandArgs.mkString(" "),None,("LD_LIBRARY_PATH",ldLibPath)).!
     } else {
-      this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"))
+      this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"), splitFaims.value)
     }
   }
 

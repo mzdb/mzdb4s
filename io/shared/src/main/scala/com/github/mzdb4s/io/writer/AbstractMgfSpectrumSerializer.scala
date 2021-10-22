@@ -20,7 +20,7 @@ abstract class AbstractMgfSpectrumSerializer {
     charge: Int,
     intensityCutoff: Option[Float],
     exportProlineTitle: Boolean
-  ): String
+  ): Array[Byte]
 
   /*protected def initStringBuilder(): Unit
   protected def clearStringBuilder(): Unit

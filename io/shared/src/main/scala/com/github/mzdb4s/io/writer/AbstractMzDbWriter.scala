@@ -488,7 +488,8 @@ abstract class AbstractMzDbWriter extends Logging {
     // --- INSERT SPECTRUM HEADER --- //
     val stmt = _spectrumInsertStmt
     stmt.bind(1, spectrumId)
-    stmt.bind(2, sh.getInitialId)
+    // FIXME: Proline should be able to work with files where the initialID differs from the mzDB ID, thus sh.getInitialId() should be used when it is fixed
+    stmt.bind(2, spectrumId) // sh.getInitialId
     stmt.bind(3, sh.title)
     stmt.bind(4, sh.getCycle)
     stmt.bind(5, sh.getTime)

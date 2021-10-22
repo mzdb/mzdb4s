@@ -15,6 +15,11 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extend
   require(rawFilePath.isFile, s"can't find file at '$rawFilePath'")
 
   protected val MS_LEVEL_ACCESSION: String = PsiMsCV.MS_LEVEL.getAccession()
+  protected val CID_ACCESSION: String = PsiMsCV.CID.getAccession()
+  protected val ETD_ACCESSION: String = PsiMsCV.ETD.getAccession()
+  protected val ETHCD_ACCESSION: String = PsiMsCV.ETHCD.getAccession()
+  protected val HCD_ACCESSION: String = PsiMsCV.HCD.getAccession()
+  protected val PSD_ACCESSION: String = PsiMsCV.PSD.getAccession()
   protected var _isConsumed = false
 
   protected val paramTreeParser: IParamTreeParser
@@ -308,19 +313,36 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extend
     //println("createSpectrum begins")
 
     val scanListParamTree = this.paramTreeParser.parseScanList(xmlMetaData.scanList)
+
     val firstScan = scanListParamTree.getScans().head
     val scanStartTimeCvTerm = firstScan.getCVParam(PsiMsCV.SCAN_START_TIME)
     val scanStartTimeUnit = scanStartTimeCvTerm.unitName.getOrElse("")
     assert(scanStartTimeUnit == "minute", s"unsupported scan time unit '$scanStartTimeUnit'")
     val scanTime = scanStartTimeCvTerm.value.toFloat * 60
 
+    var activationType = ActivationType.OTHER // unkown applied dissociation
+    var precOpt = Option.empty[Precursor]
     var precMzOpt = Option.empty[Double]
     var precChargeOpt = Option.empty[Int]
     if (msLevel > 1 && xmlMetaData.precursorList.isDefined) {
       val prec = this.paramTreeParser.parsePrecursors(xmlMetaData.precursorList.get).head
+      precOpt = Some(prec)
+
       val selIonList = prec.getSelectedIonList()
       val firstSelIonCVParams = selIonList.getSelectedIons().head.getCVParams()
       precChargeOpt = firstSelIonCVParams.find(_.getAccession == PsiMsCV.CHARGE_STATE.getAccession()).map(_.getValue.toInt)
+
+      val activationCvParams = prec.getActivation().getCVParams()
+      activationCvParams.find { cvParam =>
+        cvParam.getAccession match {
+          case CID_ACCESSION => activationType = ActivationType.CID; true
+          case ETD_ACCESSION => activationType = ActivationType.ETD; true
+          case ETHCD_ACCESSION => activationType = ActivationType.EThcD; true
+          case HCD_ACCESSION => activationType = ActivationType.HCD; true
+          case PSD_ACCESSION => activationType = ActivationType.PSD; true
+          case _ => false
+        }
+      }
 
       val monoMzOpt = firstScan.getUserParams().find { userParam =>
         userParam.getName == "[Thermo Trailer Extra]Monoisotopic M/Z:"
@@ -363,7 +385,7 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extend
       cycle = msCycle,
       time = scanTime,
       msLevel = msLevel,
-      activationType = Some(ActivationType.CID), // FIXME: parse activation tag from precursorList
+      activationType = if (msLevel == 1) None else Some(activationType),
       peaksCount = peaksCount,
       isHighResolution = true,
       tic = intensitySum,
@@ -375,6 +397,9 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extend
       isolationWindow = None // FIXME: retrieve me
     )
 
+    // Attach CV params to the scan header
+    header.setScanList(scanListParamTree)
+    precOpt.foreach(header.setPrecursor)
     //println("createSpectrum ends")
 
     RawFileSpectrum(intitialId, xmlMetaData, header, mzList, intensityListAsFloats)
