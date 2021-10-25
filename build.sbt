@@ -2,9 +2,8 @@ import scala.language.postfixOps
 import scala.sys.process._
 
 lazy val scala213 = "2.13.6"
-//lazy val scala211 = "2.11.12"
-//lazy val supportedScalaVersions = List(scala211, scala213)
-lazy val supportedScalaVersions = List(scala213)
+lazy val scala211 = "2.11.12"
+lazy val supportedScalaVersions = List(scala213, scala211)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
@@ -13,7 +12,7 @@ val sharedSettings = Seq(
   crossScalaVersions := supportedScalaVersions,
 
   libraryDependencies ++= Seq(
-    "com.outr" %%% "scribe" % "3.6.1",
+    "com.outr" %%% "scribe" % "3.6.2",
     "com.lihaoyi" %%% "utest" % "0.7.10" % Test
   ),
 
@@ -317,7 +316,13 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
         "-L" ++ baseDirectory.in(mzdb4sThermo_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.in(mzdb4sTimsData_Native).value.getAbsolutePath() ++ "/nativelib"
         //"-Wl,-allow-multiple-definition" // was used to solve conflicts regarding duplicated code definitions introduced by static libraries
-      )
+      ),
+
+      artifactPath in (Compile, nativeLink) := {
+        val ext = if (scala.scalanative.build.Platform.isWindows) ".exe" else ""
+        //crossTarget.value / (moduleName.value + "-out" + ext)
+        crossTarget.value / ("mzdbtools" + ext)
+      }
     )
   )
 
