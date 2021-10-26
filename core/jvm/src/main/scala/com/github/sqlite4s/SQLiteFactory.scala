@@ -22,9 +22,9 @@ object SQLiteFactory extends ISQLiteFactory with SQLiteConnectionFactory with SQ
 
   import java.util.{ logging => JavaLogging }
   import JavaLogging.{ Level => JavaLogLevel }
-  import LogLevel._
+  import com.github.mzdb4s.LogLevel._
 
-  def configureLogging(logLevel: LogLevel): Unit = {
+  def configureLogging(logLevel: com.github.mzdb4s.LogLevel): Unit = {
 
     val javaLogLevel = logLevel match {
       case OFF => JavaLogLevel.OFF

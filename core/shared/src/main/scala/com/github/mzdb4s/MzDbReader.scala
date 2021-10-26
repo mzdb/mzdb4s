@@ -35,7 +35,7 @@ class MzDbReader(
 
   // Disable SQLite driver connection logs
   if (!logConnections) {
-    sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
+    sf.configureLogging(com.github.mzdb4s.LogLevel.OFF)
   }
 
   // Check if database exists

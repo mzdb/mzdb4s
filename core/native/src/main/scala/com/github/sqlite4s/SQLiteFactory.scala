@@ -18,8 +18,20 @@ object SQLiteFactory extends ISQLiteFactory with SQLiteConnectionFactory with SQ
   implicit def jvmStmt2wrapper(stmt: SQLiteStatement): ISQLiteStatement = new SQLiteStatementWrapper(stmt)
   implicit def nativeBlob2wrapper(blob: SQLiteBlob): ISQLiteBlob = new SQLiteBlobWrapper(blob)
 
-  def configureLogging(logLevel: LogLevel): Unit = {
-    Logging.configureLogger(logLevel)
+  import com.github.mzdb4s.LogLevel._
+  
+  def configureLogging(logLevel: com.github.mzdb4s.LogLevel): Unit = {
+  
+    val sqlite4sLogLevel = logLevel match {
+      case OFF => LogLevel.OFF
+      case ERROR => LogLevel.ERROR
+      case WARN => LogLevel.WARN
+      case INFO => LogLevel.INFO
+      case DEBUG => LogLevel.DEBUG
+      case TRACE => LogLevel.TRACE
+    }
+    
+    Logging.configureLogger(sqlite4sLogLevel)
 
   }
 }

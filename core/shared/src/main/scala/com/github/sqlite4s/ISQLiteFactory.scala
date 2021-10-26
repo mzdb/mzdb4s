@@ -109,7 +109,7 @@ trait ISQLiteFactory extends ISQLiteConnectionFactory with ISQLiteExceptionFacto
 
   def newSQLiteException(errorCode: Int, errorMessage: String): Exception
 
-  def configureLogging(logLevel: LogLevel): Unit
+  def configureLogging(logLevel: com.github.mzdb4s.LogLevel): Unit
 }
 
 /*object SQLiteFactory extends ISQLiteFactory {
