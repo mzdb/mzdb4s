@@ -307,7 +307,8 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
 
       // Link custom native libraries
       // FIXME: on Linux we also have to do before execution
-      // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/:/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
+      // export LLVM_BIN=/usr/lib/llvm-12/bin
+      // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/core/native/nativelib/:/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/:/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
       // TODO on Windows: copy DLL files from nativelib to the target directories
       // See: https://stackoverflow.com/questions/36237174/how-to-copy-some-files-to-the-build-target-directory-with-sbt
       nativeLinkingOptions ++= Seq(
@@ -315,7 +316,7 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
         "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.in(mzdb4sThermo_Native).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.in(mzdb4sTimsData_Native).value.getAbsolutePath() ++ "/nativelib"
-        //"-Wl,-allow-multiple-definition" // was used to solve conflicts regarding duplicated code definitions introduced by static libraries
+        //"-Wl,-allow-multiple-definition" // may be used on Linux to solve conflicts regarding duplicated code definitions introduced by Rust static libraries
       ),
 
       artifactPath in (Compile, nativeLink) := {
