@@ -88,7 +88,6 @@ trait AbstractThermoTests extends TestSuite {
     val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
 
     implicit val sf: ISQLiteFactory = SQLiteFactory
-    //sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
 
     println("Opening raw file located at: " + rawFilePath)
 

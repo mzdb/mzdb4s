@@ -10,10 +10,9 @@ class TDFMetaDataReader(
   val logConnections: Boolean = false
 )(implicit sf: ISQLiteFactory) extends AutoCloseable with Logging {
 
-  // Disable logs for JVM implementation
-  // TODO: do the same for Native implementation
+  // Disable SQLite logs by default
   if (!logConnections) {
-    sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
+    sf.configureLogging(com.github.mzdb4s.LogLevel.OFF)
   }
 
   // Check if database exists

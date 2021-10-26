@@ -22,7 +22,7 @@ abstract class AbstractMzDbTools extends Logging {
 
   // Intialize SQLite and disable its internal logging
   implicit val sf: ISQLiteFactory = SQLiteFactory
-  sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
+  sf.configureLogging(com.github.mzdb4s.LogLevel.OFF)
 
   protected def _mzdb2mgf(
     mzDbPath: String,
@@ -70,7 +70,6 @@ abstract class AbstractMzDbTools extends Logging {
     //val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
 
     implicit val sf: ISQLiteFactory = SQLiteFactory
-    //sf.configureLogging(com.github.sqlite4s.LogLevel.OFF)
 
     logger.info("Opening raw file located at: " + rawFile.getAbsolutePath)
 
