@@ -34,7 +34,7 @@ abstract class AbstractMzDbTools extends Logging {
     require(new File(mzDbPath).isFile, s"can't find an mzDB file at: ${mzDbFile.getAbsolutePath}")
 
     import com.github.mzdb4s.io.writer.MgfWriter
-    logger.info("Creating MGF file for mzDB located at: " + mzDbFile.getAbsolutePath)
+    logger.info(s"Creating MGF file for mzDB located at: ${mzDbFile.getAbsolutePath}")
     //println("Precursor m/z values will be defined using the method: " + cmd.precMzComputation)
 
     val writer = MgfWriter(mzDbPath,mgfFile = Some(mgfPath))
@@ -71,7 +71,7 @@ abstract class AbstractMzDbTools extends Logging {
 
     implicit val sf: ISQLiteFactory = SQLiteFactory
 
-    logger.info("Opening raw file located at: " + rawFile.getAbsolutePath)
+    logger.info(s"Opening raw file located at: ${rawFile.getAbsolutePath}")
 
     // Open the raw file to perform the conversion
     val rawFileStreamer = wrapper.getRawFileStreamer(rawPath)
@@ -92,7 +92,7 @@ abstract class AbstractMzDbTools extends Logging {
     def createMzDbWriter(outputFile: File): MzDbWriter = {
       require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${outputFile.getAbsolutePath}")
 
-      logger.info("Writing mzDB file located at: " + outputFile.getAbsolutePath)
+      logger.info(s"Writing mzDB file located at: ${outputFile.getAbsolutePath}")
 
       val mzDbWriter = new MzDbWriter(
         outputFile,
@@ -110,29 +110,7 @@ abstract class AbstractMzDbTools extends Logging {
 
     if (!splitFaims) {
       singleMzDbWriterOpt = Some(createMzDbWriter(mzDbFile))
-    } /*else {
-      val foundFaimsCvValues = foundFaimsCvValueSet.toList.sorted
-      logger.info("Found FAIMS cv values: " + foundFaimsCvValues.mkString(", "))
-
-      for (foundFaimsCvValue <- foundFaimsCvValues) {
-        val mzDbFileNameParts = mzDbFile.getName.split('.')
-        mzDbFileNameParts(0) = mzDbFileNameParts(0) + "_CV" + (-foundFaimsCvValue).toInt
-        val faimsMzDbFile = new File(mzDbFile.getParentFile, mzDbFileNameParts.mkString("."))
-
-        require(!faimsMzDbFile.exists(), s"can't create mzDB file because it already exists at: ${faimsMzDbFile.getAbsolutePath}")
-
-        logger.info(s"Writing FAIMS mzDB file (cv=$foundFaimsCvValue) located at: " + faimsMzDbFile.getAbsolutePath)
-        val mzDbWriter = new MzDbWriter(
-          faimsMzDbFile,
-          mzDbMetaData,
-          DefaultBBSizes(),
-          isDIA = false // FIXME: we should infer this
-        )
-        mzDbWriter.open()
-
-        mzDbWriterByFaimsCv.put(foundFaimsCvValue, mzDbWriter)
-      }
-    }*/
+    }
 
     logger.info("Reading spectra from raw file...")
 
@@ -197,7 +175,7 @@ abstract class AbstractMzDbTools extends Logging {
     val mzDbFile = new File(mzDbPath)
     require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
 
-    logger.info("Writing mzDB file located at: " + mzDbFile.getAbsolutePath)
+    logger.info(s"Writing mzDB file located at: ${mzDbFile.getAbsolutePath}")
 
     implicit val sf = SQLiteFactory
     implicit val reader = TimsDataReader
