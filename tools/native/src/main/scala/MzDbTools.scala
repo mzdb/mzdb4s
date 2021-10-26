@@ -31,7 +31,7 @@ object MzDbTools extends AbstractMzDbTools {
       Zone { implicit z =>
         val path = _readLink(c"/proc/self/exe")
         require(path != null, "can't determine executable location")
-        new File(fromCString(path))
+        new File(fromCString(path)).getParentFile
       }
     }
 
