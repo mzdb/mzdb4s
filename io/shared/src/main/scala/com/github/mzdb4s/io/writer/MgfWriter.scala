@@ -4,12 +4,14 @@ import java.io._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.LongMap
+
 import com.github.mzdb4s.{Logging, MzDbReader}
 import com.github.mzdb4s.db.model.params.Precursor
 import com.github.mzdb4s.db.model.params.param.PsiMsCV
 import com.github.mzdb4s.db.table.SpectrumTable
 import com.github.mzdb4s.io.mgf._
 import com.github.mzdb4s.msdata._
+import com.github.mzdb4s.util.ms.MsUtils
 import com.github.sqlite4s.{ISQLiteFactory, SQLiteQuery}
 import com.github.sqlite4s.query.SQLiteRecord
 
@@ -381,7 +383,8 @@ class MgfWriter(
   val msLevel: Int,
   val precEstimator: MgfWriter.IPrecursorEstimator,
   val intensityCutoff: Option[Float],
-  val exportProlineTitle: Boolean
+  val exportProlineTitle: Boolean,
+  val calibratePrecursorMz: Boolean = false
 )(implicit sf: ISQLiteFactory) extends Logging {
 
   require(msLevel == 2 || msLevel == 3, "msLevel must be 2 or 3")
@@ -404,12 +407,95 @@ class MgfWriter(
     titleBySpectrumId
   }
 
+  private def _calcMzCalibration(mzDbReader: MzDbReader, mzTolPPM: Int): collection.Seq[(Float, Float)] = {
+    val lysY1TheoMz = 147.112804
+    val argY1TheoMz = 175.118952
+
+    val bufferCapacity = 200
+    val bufferUsedItems = 100
+    case class PeakError(rt: Float, mzError: Double, peak: IPeak)
+    val mzDiffBuffer = new RingBuffer[PeakError](bufferCapacity)
+    var addedItems = 0
+
+    val rtDeltaMzData = new ArrayBuffer[Tuple2[Float,Float]]
+
+    val ms2SpectraIter = mzDbReader.getSpectrumIterator(2)
+    while (ms2SpectraIter.hasNext()) {
+      val spectrum = ms2SpectraIter.next()
+      val lysY1PeakOpt = Option(spectrum.getNearestPeak(lysY1TheoMz, mzTolPPM))
+      val argY1PeakOpt = Option(spectrum.getNearestPeak(argY1TheoMz, mzTolPPM))
+
+      lazy val lysY1PeakInfoOpt = lysY1PeakOpt.map { lysY1Peak =>
+        Tuple4(lysY1TheoMz, spectrum.header.time, MsUtils.DaToPPM(lysY1TheoMz, lysY1Peak.getMz() - lysY1TheoMz), lysY1Peak)
+      }
+
+      lazy val argY1PeakInfoOpt = argY1PeakOpt.map { argY1Peak =>
+        Tuple4(argY1TheoMz, spectrum.header.time, MsUtils.DaToPPM(argY1TheoMz, argY1Peak.getMz() - argY1TheoMz), argY1Peak)
+      }
+
+      val highestPeakInfoOpt = if (lysY1PeakOpt.isDefined && argY1PeakOpt.isDefined) {
+        if (lysY1PeakOpt.get.getIntensity() > argY1PeakOpt.get.getIntensity()) lysY1PeakInfoOpt
+        else argY1PeakInfoOpt
+      } else if (lysY1PeakOpt.isDefined) {
+        lysY1PeakInfoOpt
+      } else if (argY1PeakOpt.isDefined) {
+        argY1PeakInfoOpt
+      } else None
+
+      if (highestPeakInfoOpt.isDefined) {
+        val dp = PeakError(highestPeakInfoOpt.get._2, highestPeakInfoOpt.get._3, highestPeakInfoOpt.get._4)
+        mzDiffBuffer.put(dp)
+        addedItems += 1
+
+        if (addedItems == bufferUsedItems) {
+          addedItems = 0
+
+          val mzErrors = mzDiffBuffer.underlying
+            .filter(_ != null)
+            .sortBy(- _.peak.getIntensity())
+            .take(bufferUsedItems)
+            .sortBy(_.mzError)
+
+          // Remove outliers for better median estimation
+          val nErrors = mzErrors.length
+          val q1 = mzErrors(nErrors / 4).mzError
+          val q3 = mzErrors(3 * nErrors / 4).mzError
+          val iqr = q3 - q1
+          val ub = q3 + 1.5 * iqr
+          val lb = q1 - 1.5 * iqr
+          val filteredMzErrors = mzErrors.filter(pe => pe.mzError > lb && pe.mzError < ub)
+
+          if (filteredMzErrors.length >= 5) {
+            val avgPeak = filteredMzErrors.apply( bufferUsedItems / 2 ) // median
+
+            rtDeltaMzData += Tuple2(avgPeak.rt, avgPeak.mzError.toFloat)
+          }
+
+        }
+      }
+    }
+
+    // Remove the first and last data points (non reliable)
+    if (rtDeltaMzData.length > 10) rtDeltaMzData.tail.dropRight(1).sortBy(_._1) else rtDeltaMzData
+  }
+
+  private def _calcCalibratedPrecMz(precMz: Double, rt: Float, mzCalib: collection.Seq[(Float,Float)]): Double = {
+    if (mzCalib.length < 10) return precMz
+
+    val mzErrorPPM = com.github.mzdb4s.util.math.linearInterpolation(rt, mzCalib) // exp - theo
+    val mzErrorDa = MsUtils.ppmToDa(precMz, mzErrorPPM)
+
+    precMz - mzErrorDa
+  }
+
   def write(): Unit = {
 
     var precsNotFoundCount = 0
 
     // Create MGF writer and mzDB reader
     val mzDbReader = new MzDbReader(this.mzDBFilePath, true)
+
+    lazy val mzCalibration = this._calcMzCalibration(mzDbReader, 50)
 
     val bufferSize = 4 * 1024 * 1024 // 4 MB buffer
     val mgfWriter = new BufferedOutputStream(new FileOutputStream(mgfFile), bufferSize)
@@ -452,13 +538,15 @@ class MgfWriter(
           }
         }
 
+        lazy val calibratedPrecMz = this._calcCalibratedPrecMz(precMz, spectrumHeader.time, mzCalibration)
+
         val spectrumAsBytes = spectrumSerializer.stringifySpectrum(
           mzDBFilePath,
           mzDbReader,
           s,
           titleBySpectrumId,
           dataEnc,
-          precMz,
+          if (calibratePrecursorMz) calibratedPrecMz else precMz,
           charge,
           intensityCutoff,
           exportProlineTitle
@@ -487,6 +575,43 @@ class MgfWriter(
       spectrumSerializer.dispose()
     }
 
+  }
+
+}
+
+
+// Source: https://www.gregbeech.com/2018/06/05/writing-a-ring-buffer-in-scala/
+import scala.reflect.ClassTag
+
+//** A very simple, naive and not thread safe ring buffer. */
+private class RingBuffer[T:ClassTag](val capacity: Int) {
+  assert(capacity>0 && capacity < Int.MaxValue)
+
+  // invariants:
+  // * head     is equal to tail -> the buffer is empty
+  // * (head+1) is equal to tail -> the buffer is full
+  // * tail always points to a sentinel, which is necessarily free
+
+  private var head: Int = 0
+  private var tail: Int = 0
+
+  private val len  = capacity+1
+  private val ring = new Array[T](len)
+
+  def underlying: Array[T] = ring
+
+  def size: Int = if(head>=tail) head-tail else len-tail+head
+
+  def put(o: T): Option[T] = {
+    var next = head+1
+    next = if(next>=len) 0 else next
+    //if(next==tail)
+    //  None
+    //else {
+    ring(head) = o
+    head = next
+    Some(o)
+    //}
   }
 
 }

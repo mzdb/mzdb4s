@@ -734,7 +734,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     val offset: CPtrDiff = binaryDataArrayListChunk - xml_c_str
 
     val spectrumHeaderChunkLen = offset + spectrumEndTagLen
-    spectrumHeaderChunk = alloc[CChar]( spectrumHeaderChunkLen + 1 )
+    spectrumHeaderChunk = alloc[CChar]( (spectrumHeaderChunkLen + 1).toULong )
     assert(spectrumHeaderChunk != null, "_parse_chunk: can't allocate memory")
 
     // Copy wanted XML portions (cvParams, meta-data, and spectrumEndTag)
@@ -935,7 +935,7 @@ class MzMLSpectrumChunk(val id: String, var xml_c_str: CString)(implicit z: Zone
     var i = accessionStrLen + 1 // skip 'accession="'
     var foundValue = false
     val cvParamAC: CString = stackalloc[CChar]((10 + 1).toULong)
-    cvParamAC(10) = CUtils.NULL_CHAR
+    cvParamAC(10.toULong) = CUtils.NULL_CHAR
 
     while (i < maxLen && !foundValue) {
       val c = accessionChunk(i)

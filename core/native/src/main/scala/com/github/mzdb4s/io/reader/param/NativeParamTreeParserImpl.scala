@@ -4,6 +4,7 @@ import scala.collection.Seq
 import scala.scalanative.libc.string.strstr
 import scala.scalanative.libc.string.strlen
 import scala.scalanative.unsafe._
+import scala.scalanative.unsigned._
 
 import com.github.mzdb4s.db.model.params._
 import com.github.mzdb4s.db.model.params.param._
@@ -196,7 +197,7 @@ object NativeParamTreeParserImpl {
     var j = 0
     var i = attrLen + 1 // skip attribute string + one char (")
     var reachedEndOfContent = false
-    val attributeContentAsCStr: CString = stackalloc[CChar](bufferSize)
+    val attributeContentAsCStr: CString = stackalloc[CChar](bufferSize.toULong)
 
     while (i < chunkLen && !reachedEndOfContent) {
       val c = attributeChunk(i)

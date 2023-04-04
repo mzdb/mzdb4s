@@ -1,3 +1,4 @@
+
 import java.io.File
 import mainargs._
 
@@ -39,7 +40,7 @@ object MzDbTools extends AbstractMzDbTools {
 
   @main
   def mzdb2mgf(
-    @arg(short = 'i', doc = "Path to the mzDB input file")
+    @arg(short = 'i', name = "mzdb", doc = "Path to the mzDB input file")
     mzdb: String,
     @arg(short = 'o', name = "mgf", doc = "Path to the MGF output file")
     mgfOpt: Option[String]
@@ -49,7 +50,7 @@ object MzDbTools extends AbstractMzDbTools {
 
   @main
   def thermo2mzdb(
-    @arg(short = 'i', doc = "Path to the raw input file")
+    @arg(short = 'i', name = "raw", doc = "Path to the raw input file")
     raw: String,
     @arg(short = 'o', name = "mzdb", doc = "Path to the mzDB output file")
     mzdbOpt: Option[String],
@@ -63,13 +64,22 @@ object MzDbTools extends AbstractMzDbTools {
   def tdf2mzdb(
     @arg(short = 'i', name = "tdf-dir", doc = "Path to the TDF input directory")
     tdfDir: String,
-    @arg(short = 'o', doc = "Path to the mzDB output file")
-    mzdbOpt: Option[String]
+    @arg(short = 'o', name = "mzdb", doc = "Path to the mzDB output file")
+    mzdbOpt: Option[String],
+    @arg(name = "mzdist", doc = "Minimum distance between consecutive m/z values (PPM unit)")
+    mzdistOpt: Option[Int]
   ): Unit = {
-    this._tdf2mzdb(tdfDir,mzdbOpt.getOrElse(tdfDir + ".mzDB"))
-
-    //System.err.println("Not yet implemented!")
-    //System.exit(-1)
+    this._tdf2mzdb(
+      tdfDir,
+      mzdbOpt.getOrElse(tdfDir + ".mzDB"),
+      Some(com.github.mzdb4s.io.timsdata.TimsDataReaderConfig(
+        ms1Only = true,
+        mzTolPPM = mzdistOpt.getOrElse(10),
+        minDataPointsCount = 1,
+        nThreads = 4,
+        nTimsdataDllThreads = 4,
+      ))
+    )
   }
 
   def main(args: Array[String]): Unit = ParserForMethods(this).runOrExit(args)

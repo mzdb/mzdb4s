@@ -18,7 +18,7 @@ object QuickXmlLibrary {
     def quickxml_print_hello_world(): Unit
 
     // Push parser API
-    def quickxml_create_parser(): Pointer
+    /*def quickxml_create_parser(): Pointer
     def quickxml_destroy_parser(parser: Pointer): Unit
     def quickxml_register_cb(
       parser: Pointer,
@@ -28,7 +28,7 @@ object QuickXmlLibrary {
     def quickxml_parse_xml(
       parser: Pointer,
       xml: String
-    ): Unit
+    ): Unit*/
 
     // Pull parser API
     def quickxml_create_pull_parser(@In xml: Pointer): Pointer

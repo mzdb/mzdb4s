@@ -158,7 +158,7 @@ object YxmlUtils extends Logging {
 
     val yxmlBuf = alloc[Byte](YXML_BUFF_SIZE)
 
-    val yxmlPtr: Ptr[yxml_t] = stackalloc[yxml_t] // no need to free because we are on the stack :)
+    val yxmlPtr: Ptr[yxml_t] = stackalloc[yxml_t]() // no need to free because we are on the stack :)
     yxml_init(yxmlPtr, yxmlBuf, YXML_BUFF_SIZE)
 
     // Implicit conversion of struct

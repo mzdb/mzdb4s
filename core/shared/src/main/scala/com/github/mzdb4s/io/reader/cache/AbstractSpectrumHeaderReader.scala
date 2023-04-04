@@ -100,7 +100,8 @@ abstract class AbstractSpectrumHeaderReader(
         val activationTypeOpt = if (msLevel == 1) None
         else {
           val activationTypeAsStr = stmt.columnString(SpectrumHeaderColIdx.activationType)
-          Some(ActivationType.withName(activationTypeAsStr))
+          if (activationTypeAsStr == null) None
+          else Some(ActivationType.withName(activationTypeAsStr))
         }
 
         var precursorMz = Option.empty[Double]

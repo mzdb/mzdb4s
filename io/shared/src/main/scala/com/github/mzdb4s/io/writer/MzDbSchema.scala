@@ -177,7 +177,7 @@ object MzDbSchema {
     "FOREIGN KEY (run_id) REFERENCES run (id),",
     "FOREIGN KEY (data_processing_id) REFERENCES data_processing (id),",
     "FOREIGN KEY (data_encoding_id) REFERENCES data_encoding (id),",
-    "FOREIGN KEY (bb_first_spectrum_id) REFERENCES tmp_spectrum (id) \n);\n",
+    "FOREIGN KEY (bb_first_spectrum_id) REFERENCES bounding_box (first_spectrum_id) \n);\n",
 
     "CREATE TABLE bounding_box (",
     "id INTEGER PRIMARY KEY AUTOINCREMENT,",
@@ -186,8 +186,8 @@ object MzDbSchema {
     "first_spectrum_id INTEGER NOT NULL,",
     "last_spectrum_id INTEGER NOT NULL,",
     "FOREIGN KEY (run_slice_id) REFERENCES run_slice (id),",
-    "FOREIGN KEY (first_spectrum_id) REFERENCES tmp_spectrum (id),",      // TODO: when do we reference spectrum instead of tmp_spectrum
-    "FOREIGN KEY (last_spectrum_id) REFERENCES tmp_spectrum (id) \n);\n", // TODO: when do we reference spectrum instead of tmp_spectrum
+    "FOREIGN KEY (first_spectrum_id) REFERENCES spectrum (id),",      // TODO: when do we reference spectrum instead of tmp_spectrum
+    "FOREIGN KEY (last_spectrum_id) REFERENCES spectrum (id) \n);\n", // TODO: when do we reference spectrum instead of tmp_spectrum
 
     "CREATE TABLE cv_term (",
     "accession TEXT NOT NULL,",

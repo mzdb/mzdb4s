@@ -1,10 +1,11 @@
 import java.io.File
-import mainargs._
+
 import com.github.mzdb4s._
 import com.github.mzdb4s.db.model.MzDbHeader
 import com.github.mzdb4s.db.model.params.ParamTree
 import com.github.mzdb4s.db.model.params.param.PsiMsCV
 import com.github.mzdb4s.io.thermo.RawFileParserWrapper
+import com.github.mzdb4s.io.timsdata.TimsDataReaderConfig
 import com.github.mzdb4s.io.writer.MzDbWriter
 import com.github.mzdb4s.msdata._
 import com.github.sqlite4s.{ISQLiteFactory, SQLiteFactory}
@@ -14,8 +15,8 @@ abstract class AbstractMzDbTools extends Logging {
   protected def getAssemblyDir(): File
 
   // Define the directory containing native libraries for JFFI and SQLite4Java
-  protected val NATIVE_LIB_DIR = new File(getAssemblyDir(), "lib").getAbsoluteFile.getCanonicalFile
-  protected val NATIVE_LIB_DIR_PATH = NATIVE_LIB_DIR.getAbsolutePath
+  protected lazy val NATIVE_LIB_DIR = new File(getAssemblyDir(), "lib").getAbsoluteFile.getCanonicalFile
+  protected lazy val NATIVE_LIB_DIR_PATH = NATIVE_LIB_DIR.getAbsolutePath
 
   // Configure mzdb4s logging
   Logging.configureLogger(LogLevel.DEBUG)
@@ -31,7 +32,7 @@ abstract class AbstractMzDbTools extends Logging {
     logger.info("--- mzDB to MGF file converter ---")
 
     val mzDbFile = new File(mzDbPath)
-    require(new File(mzDbPath).isFile, s"can't find an mzDB file at: ${mzDbFile.getAbsolutePath}")
+    require(mzDbFile.isFile, s"can't find an mzDB file at: ${mzDbFile.getAbsolutePath}")
 
     import com.github.mzdb4s.io.writer.MgfWriter
     logger.info(s"Creating MGF file for mzDB located at: ${mzDbFile.getAbsolutePath}")
@@ -161,7 +162,8 @@ abstract class AbstractMzDbTools extends Logging {
 
   protected  def _tdf2mzdb(
     tdfDir: String,
-    mzDbPath: String
+    mzDbPath: String,
+    config: Option[TimsDataReaderConfig]
   ): Unit = {
 
     import com.github.mzdb4s.io.timsdata._
@@ -182,7 +184,7 @@ abstract class AbstractMzDbTools extends Logging {
 
     TimsReaderLibraryFactory.initLogger()
 
-    val converter = new TimsData2MzDb(tdfDir, mzDbPath)
+    val converter = new TimsData2MzDb(tdfDir, mzDbPath, config)
     converter.convert()
 
     logger.info("TDF -> mzDB conversion has completed :)")

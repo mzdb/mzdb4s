@@ -74,24 +74,24 @@ object MonoEmbeddinator {
       def `type`: mono_embeddinator_error_type_t = p._1
       def `type_=`(value: mono_embeddinator_error_type_t): Unit = p._1 = value
       def exception: Ptr[MonoException] = p._2
-      def exception_=(value: Ptr[MonoException]): Unit = !p._2 = value
+      def exception_=(value: Ptr[MonoException]): Unit = { p._2 = value }
       def string: CString = p._3
-      def string_=(value: CString): Unit = p._3 = value
+      def string_=(value: CString): Unit = { p._3 = value }
     }
 
     implicit class struct_MonoEmbedObject_ops(val p: Ptr[struct_MonoEmbedObject]) extends AnyVal {
       def _class: Ptr[MonoClass] = p._1
-      def _class_=(value: Ptr[MonoClass]): Unit = p._1 = value
+      def _class_=(value: Ptr[MonoClass]): Unit = { p._1 = value }
       def _handle: uint32_t = p._2
-      def _handle_=(value: uint32_t): Unit = p._2 = value
+      def _handle_=(value: uint32_t): Unit = { p._2 = value }
     }
   }
 
   object struct_mono_embeddinator_context_t {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct_mono_embeddinator_context_t] = alloc[struct_mono_embeddinator_context_t]
+    def apply()(implicit z: Zone): Ptr[struct_mono_embeddinator_context_t] = alloc[struct_mono_embeddinator_context_t]()
     def apply(domain: Ptr[MonoDomain])(implicit z: Zone): Ptr[struct_mono_embeddinator_context_t] = {
-      val ptr = alloc[struct_mono_embeddinator_context_t]
+      val ptr = alloc[struct_mono_embeddinator_context_t]()
       ptr.domain = domain
       ptr
     }
@@ -99,9 +99,9 @@ object MonoEmbeddinator {
 
   object struct_mono_embeddinator_error_t {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct_mono_embeddinator_error_t] = alloc[struct_mono_embeddinator_error_t]
+    def apply()(implicit z: Zone): Ptr[struct_mono_embeddinator_error_t] = alloc[struct_mono_embeddinator_error_t]()
     def apply(`type`: mono_embeddinator_error_type_t, exception: Ptr[MonoException], string: CString)(implicit z: Zone): Ptr[struct_mono_embeddinator_error_t] = {
-      val ptr = alloc[struct_mono_embeddinator_error_t]
+      val ptr = alloc[struct_mono_embeddinator_error_t]()
       ptr.`type` = `type`
       ptr.exception = exception
       ptr.string = string
@@ -111,9 +111,9 @@ object MonoEmbeddinator {
 
   object struct_MonoEmbedObject {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedObject] = alloc[struct_MonoEmbedObject]
+    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedObject] = alloc[struct_MonoEmbedObject]()
     def apply(_class: Ptr[MonoClass], _handle: uint32_t)(implicit z: Zone): Ptr[struct_MonoEmbedObject] = {
-      val ptr = alloc[struct_MonoEmbedObject]
+      val ptr = alloc[struct_MonoEmbedObject]()
       ptr._class = _class
       ptr._handle = _handle
       ptr

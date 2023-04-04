@@ -62,7 +62,7 @@ object TimsData2MzDb extends com.github.mzdb4s.Logging {
 }
 */
 
-class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr: ITimsDataReader, sf: ISQLiteFactory) extends Logging {
+class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Option[TimsDataReaderConfig] = None)(implicit tdr: ITimsDataReader, sf: ISQLiteFactory) extends Logging {
   private val timsDataDir = new File(timsDataDirPath)
   require(timsDataDir.isDirectory, "can't find directory at: " + timsDataDirPath)
 
@@ -89,7 +89,8 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
     _queueLastSpectrumId = 0
     _queueLastCycle = 0
 
-    val ms2MzTolPPM = 50
+    //val siblingMzTolPPM = config.map(_.mzTolPPM).getOrElse(10)
+    val peakClusterMzTolPPM = config.map(_.mzTolPPM).getOrElse(10)
 
     //val writtenPrecById = new collection.mutable.LongMap[Boolean] // only used of MGF file loaded
     var writer: MzDbWriter = null
@@ -246,7 +247,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
 
       logger.info("Reading and processing spectra from TDF file...")
 
-      tdr.forEachMergedSpectrum(timsDataDirPath, { (frameId: Long, firstScan: Int, lastScan: Int, _mzValues: Array[Double], _intensityValues: Array[Float]) =>
+      tdr.forEachMergedSpectrum(timsDataDirPath, config, { (frameId: Long, firstScan: Int, lastScan: Int, _mzValues: Array[Double], _intensityValues: Array[Float]) =>
 
         val frame = frameById(frameId)
         //var precMzOpt = Option.empty[Double]
@@ -254,9 +255,10 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
 
         // Post-processing of detected peaks (workaround for missing proper peak-picker in rust code)
         val (mzValues, intensityValues) = if (frame.msType == MS || !mgfFileExists) {
-          //println(".")
-          //val mzValues = _mzValues
-          //val intensityValues = _intensityValues
+          //(_mzValues, _intensityValues)
+
+          /*if (frame.id == 10235)
+            println(_mzValues.toList)*/
 
           val sortedIndexedIntensities = _intensityValues.zipWithIndex.sortBy(- _._1)
           val initialPeaksCount = _mzValues.length
@@ -270,42 +272,68 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String)(implicit tdr:
             curAggregatedPeaks += Tuple2(mz, intensity)
             usedPeakIndices.put(curPeakIdx,true)
 
+            var siblingMz = mz
             var peakIdx = curPeakIdx + 1
             var hasNextPeaks = true
             while (hasNextPeaks && peakIdx < initialPeaksCount) {
               val nextPeakMz = _mzValues(peakIdx)
-              val mzDiffPPM = MsUtils.DaToPPM(mz, math.abs(mz - nextPeakMz))
+              //val siblingMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(siblingMz - nextPeakMz))
+              val clusterMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(mz - nextPeakMz))
 
-              if (mzDiffPPM > ms2MzTolPPM) hasNextPeaks = false
+              if (clusterMzDiffPPM > peakClusterMzTolPPM) hasNextPeaks = false
               else {
                 curAggregatedPeaks += Tuple2(nextPeakMz, _intensityValues(peakIdx))
                 usedPeakIndices.put(peakIdx,true)
+                siblingMz = nextPeakMz
               }
 
               peakIdx += 1
             }
 
+            siblingMz = mz
             peakIdx = curPeakIdx - 1
             var hasPrevPeaks = true
             while (hasPrevPeaks && peakIdx >= 0) {
               val prevPeakMz = _mzValues(peakIdx)
-              val mzDiffPPM = MsUtils.DaToPPM(mz, math.abs(mz - prevPeakMz))
+              val siblingMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(siblingMz - prevPeakMz))
+              val clusterMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(mz - prevPeakMz))
 
-              if (mzDiffPPM > ms2MzTolPPM) hasPrevPeaks = false
+              if (clusterMzDiffPPM > peakClusterMzTolPPM) hasPrevPeaks = false
               else {
                 curAggregatedPeaks += Tuple2(prevPeakMz, _intensityValues(peakIdx))
                 usedPeakIndices.put(peakIdx,true)
+                siblingMz = prevPeakMz
               }
 
               peakIdx -= 1
             }
 
             // TODO: compute weighted average instead
-            filteredPeaks += curAggregatedPeaks.maxBy(_._2)
+            var maxIntensity = 0f
+            var intensitySum = 0.0
+            var mzWeightedSum = 0.0
+            for ((mz,intensity) <- curAggregatedPeaks) {
+              if (intensity > maxIntensity) maxIntensity = intensity
+              intensitySum += intensity
+              mzWeightedSum += mz * intensity
+            }
+
+            filteredPeaks += Tuple2(mzWeightedSum / intensitySum, maxIntensity)
+
+            /*if (frame.id == 10235) {
+              println(curAggregatedPeaks.toList)
+              println(s"maxIntensity=$maxIntensity; intensitySum=$intensitySum; mzWeightedSum=$mzWeightedSum")
+            }*/
+
             curAggregatedPeaks.clear()
           }
 
           val (mzValuesBuf, intensityValuesBuf) = filteredPeaks.sortBy(_._1).unzip
+
+          /*if (frame.id == 10235) {
+            println(mzValuesBuf.toList)
+          }*/
+
           (mzValuesBuf.toArray, intensityValuesBuf.toArray)
 
         } /*else if (frame.msType == PASEF) {

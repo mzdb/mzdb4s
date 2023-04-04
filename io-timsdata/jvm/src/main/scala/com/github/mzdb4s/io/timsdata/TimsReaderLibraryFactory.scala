@@ -17,6 +17,7 @@ object TimsReaderLibraryFactory {
   }
 
   def getLibrary(): TimsReaderLibrary = rustLib
+  def getRuntime(): jnr.ffi.Runtime = runtime
 
   def printText(): Unit = {
     assert(rustLib != null, "the library is not loaded")

@@ -1,13 +1,13 @@
 import scala.language.postfixOps
 import scala.sys.process._
 
-lazy val scala213 = "2.13.6"
+lazy val scala213 = "2.13.8"
 lazy val scala211 = "2.11.12"
 lazy val supportedScalaVersions = List(scala213, scala211)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.3",
+  version := "0.4.4",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
@@ -35,7 +35,7 @@ val sharedNativeSettings = Seq(
   // Set to false or remove if you want to show stubs as linking errors
   nativeLinkStubs := true,
   nativeMode := "release-fast", //"debug", //"release-fast", //"release",
-  nativeLTO := "thin",   // "none","thin" // note: thin doesn't work when Rust static libraries are linked
+  nativeLTO := "none",   // "none","thin" // note: thin doesn't work when Rust static libraries are linked
   nativeGC := "immix"    // "none","boehm","commix","immix"
 )
 
@@ -55,7 +55,7 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(
     sharedJvmSettings ++ Seq(
       libraryDependencies ++= Seq(
-        "com.github.jnr" % "jnr-ffi" % "2.2.7",
+        "com.github.jnr" % "jnr-ffi" % "2.2.12",
         "com.almworks.sqlite4java" % "sqlite4java" % "1.0.392",
 
         // OS dependant SQLite library dependency
@@ -104,7 +104,7 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
 
       // Link custom native libraries
       nativeLinkingOptions ++= Seq(
-        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sCore_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib",
       ),
 
@@ -140,7 +140,7 @@ lazy val mzdb4sIO = crossProject(JVMPlatform, NativePlatform)
         }
       },
 
-      (compile in Compile) := ((compile in Compile) dependsOn makeLibraries).value
+      (Compile / compile) := ((Compile / compile) dependsOn makeLibraries).value
     )
   )
 
@@ -176,7 +176,7 @@ lazy val mzdb4sThermo = crossProject(JVMPlatform, NativePlatform)
       // FIXME: on Linux we also have to do before execution
       // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-thermo/native/nativelib/
       nativeLinkingOptions ++= Seq(
-        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sCore_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
       )
     )
@@ -211,8 +211,8 @@ lazy val mzdb4sTimsData = crossProject(JVMPlatform, NativePlatform)
       // FIXME: on Linux we also have to do before execution
       // export LD_LIBRARY_PATH=/mnt/d/Dev/wsl/scala-native/mzdb4s/io-timsdata/native/nativelib
       nativeLinkingOptions ++= Seq(
-        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sCore_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sIO_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
         "-L" ++ baseDirectory.value.getAbsolutePath() ++ "/nativelib"
       )
     )
@@ -287,9 +287,9 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
     ),
 
     // -- SBT assembly settings -- //
-    mainClass in assembly := Some("MzDbTools"),
-    assemblyJarName in assembly := "mzdbtools.jar",
-    assemblyMergeStrategy in assembly := {
+    assembly / mainClass := Some("MzDbTools"),
+    assembly / assemblyJarName := "mzdbtools.jar",
+    assembly / assemblyMergeStrategy := {
       case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
       case _ => MergeStrategy.first
     }
@@ -312,10 +312,10 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
       // TODO on Windows: copy DLL files from nativelib to the target directories
       // See: https://stackoverflow.com/questions/36237174/how-to-copy-some-files-to-the-build-target-directory-with-sbt
       nativeLinkingOptions ++= Seq(
-        "-L" ++ baseDirectory.in(mzdb4sCore_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-L" ++ baseDirectory.in(mzdb4sIO_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-L" ++ baseDirectory.in(mzdb4sThermo_Native).value.getAbsolutePath() ++ "/nativelib",
-        "-L" ++ baseDirectory.in(mzdb4sTimsData_Native).value.getAbsolutePath() ++ "/nativelib"
+        "-L" ++ (mzdb4sCore_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sIO_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sThermo_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib",
+        "-L" ++ (mzdb4sTimsData_Native / baseDirectory).value.getAbsolutePath() ++ "/nativelib"
         //"-Wl,-allow-multiple-definition" // may be used on Linux to solve conflicts regarding duplicated code definitions introduced by Rust static libraries
       ),
 

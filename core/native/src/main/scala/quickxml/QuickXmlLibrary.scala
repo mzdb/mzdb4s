@@ -10,8 +10,8 @@ object QuickXmlLibrary {
   def quickxml_print_hello_world(): Unit = extern
 
   // Push parser API
-  def quickxml_create_parser(): Ptr[Unit] = extern
-  def quickxml_destroy_parser(parser: Ptr[Unit]): Unit = extern
+  //def quickxml_create_parser(): Ptr[Unit] = extern
+  //def quickxml_destroy_parser(parser: Ptr[Unit]): Unit = extern
 
   type quickxml_parser_cb = CFuncPtr2[Ptr[Byte], Int, Unit]
   def quickxml_register_cb(

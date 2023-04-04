@@ -9,9 +9,9 @@ object TimsDataReader extends ITimsDataReader {
 
   //type ForEachMergedFrameCb = (Long, Int, Array[Double], Array[Float]) => Unit
 
-  def forEachMergedSpectrum(timsDataDir: String, onEachMergedSpectrum: ForEachMergedSpectrumCb): Unit = {
+  def forEachMergedSpectrum(timsDataDir: String, config: Option[TimsDataReaderConfig], onEachMergedSpectrum: ForEachMergedSpectrumCb): Unit = {
 
-    val errMsgPtr: Ptr[CString] = stackalloc[CString]
+    val errMsgPtr: Ptr[CString] = stackalloc[CString]()
 
     val contextPtr = fromRawPtr[Unit](Intrinsics.castObjectToRawPtr(onEachMergedSpectrum))
 

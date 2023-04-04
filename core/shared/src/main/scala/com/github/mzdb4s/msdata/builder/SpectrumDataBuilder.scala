@@ -33,11 +33,13 @@ abstract class AbstractSpectrumDataBuilder extends ISpectrumDataBuilder {}
 
 object SpectrumDataBuilder {
   def mergeSpectrumDataList(spectrumDataList: Seq[ISpectrumData], peaksCount: Int): SpectrumData = {
+    val sortedSpectrumDataList = spectrumDataList.filter(_.peaksCount > 0).sortBy(_.mzList.head)
+
     val finalMzList = new Array[Double](peaksCount)
     val finalIntensityList = new Array[Float](peaksCount)
     var finalLeftHwhmList: Array[Float] = null
     var finalRightHwhmList: Array[Float] = null
-    val firstSpectrumData = spectrumDataList.head
+    val firstSpectrumData = sortedSpectrumDataList.head
     if (firstSpectrumData.leftHwhmList != null && firstSpectrumData.rightHwhmList != null) {
       finalLeftHwhmList = new Array[Float](peaksCount)
       finalRightHwhmList = new Array[Float](peaksCount)
@@ -45,11 +47,13 @@ object SpectrumDataBuilder {
 
     // TODO: check that spectrumDataList is m/z sorted ???
     var finalPeakIdx = 0
-    for (spectrumData <- spectrumDataList) {
+    for (spectrumData <- sortedSpectrumDataList) {
+
       val mzList = spectrumData.mzList
       val intensityList = spectrumData.intensityList
       val leftHwhmList = spectrumData.leftHwhmList
       val rightHwhmList = spectrumData.rightHwhmList
+
       // Add peaks of this SpectrumData to the final arrays
       val spectrumDataPeaksCount = spectrumData.peaksCount
 
@@ -66,6 +70,11 @@ object SpectrumDataBuilder {
         i += 1
       }
     }
+
+    assert(
+      finalPeakIdx == peaksCount,
+      s"inconsistent number of peaks in the produced SpectrumData (expected $peaksCount peaks but has $finalPeakIdx)"
+    )
 
     SpectrumData(finalMzList, finalIntensityList, finalLeftHwhmList, finalRightHwhmList)
   }

@@ -20,7 +20,7 @@ object DateParser extends IDateParser {
     val Array(isoDate,dateSuffix) = dateStr.split('.')
     val Array(millis,zoneHoursShift,zonneMinutesShift) = dateSuffix.split("[+:]")
 
-    val tm_ptr = stackalloc[time.tm]
+    val tm_ptr = stackalloc[time.tm]()
     string.memset(tm_ptr.asInstanceOf[Ptr[Byte]], 0, sizeof[time.time_t])
 
     val timeSinceEpoch = scala.scalanative.unsafe.Zone { implicit z =>

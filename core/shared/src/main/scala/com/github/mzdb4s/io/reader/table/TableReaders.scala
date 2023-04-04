@@ -116,7 +116,8 @@ class SoftwareReader()(implicit val mzDbContext: MzDbContext) extends AbstractTa
     val name = r.columnString(SoftwareTable.NAME)
     val version = r.columnString(SoftwareTable.VERSION)
     val paramTreeAsStr = r.columnString(SoftwareTable.PARAM_TREE)
-    Software(id, name, version, ParamTreeParser.instance.parseParamTree(paramTreeAsStr))
+    val paramTree = if (paramTreeAsStr.isEmpty) null else ParamTreeParser.instance.parseParamTree(paramTreeAsStr)
+    Software(id, name, version, paramTree)
   }
 
   def getSoftware(id: Int): Software = getRecord(Software.TABLE_NAME, id)

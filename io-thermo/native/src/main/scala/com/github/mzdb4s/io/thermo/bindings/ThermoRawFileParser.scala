@@ -704,9 +704,9 @@ object ThermoRawFileParser {
 
   object struct__GArray {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct__GArray] = alloc[struct__GArray]
+    def apply()(implicit z: Zone): Ptr[struct__GArray] = alloc[struct__GArray]()
     def apply(data: CString, len: gint)(implicit z: Zone): Ptr[struct__GArray] = {
-      val ptr = alloc[struct__GArray]
+      val ptr = alloc[struct__GArray]()
       ptr.data = data
       ptr.len = len
       ptr
@@ -715,9 +715,9 @@ object ThermoRawFileParser {
 
   object struct_MonoEmbedObject {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedObject] = alloc[struct_MonoEmbedObject]
+    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedObject] = alloc[struct_MonoEmbedObject]()
     def apply(_class: Ptr[MonoClass], _handle: uint32_t)(implicit z: Zone): Ptr[struct_MonoEmbedObject] = {
-      val ptr = alloc[struct_MonoEmbedObject]
+      val ptr = alloc[struct_MonoEmbedObject]()
       ptr._class = _class
       ptr._handle = _handle
       ptr
@@ -726,9 +726,9 @@ object ThermoRawFileParser {
 
   object struct_MonoEmbedArray {
     import implicits._
-    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedArray] = alloc[struct_MonoEmbedArray]
+    def apply()(implicit z: Zone): Ptr[struct_MonoEmbedArray] = alloc[struct_MonoEmbedArray]()
     def apply(array: Ptr[GArray])(implicit z: Zone): Ptr[struct_MonoEmbedArray] = {
-      val ptr = alloc[struct_MonoEmbedArray]
+      val ptr = alloc[struct_MonoEmbedArray]()
       ptr.array = array
       ptr
     }

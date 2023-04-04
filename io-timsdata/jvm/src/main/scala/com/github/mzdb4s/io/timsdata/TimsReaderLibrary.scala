@@ -23,11 +23,36 @@ trait OnEachFrameCallback {
   final val message = new String()
 }*/
 
+class TimsDataReaderConfigAsStruct(val runtime: Runtime) extends Struct(runtime) {
+  val ms1Only = new Boolean()
+  val mzTolPPM = new Signed32()
+  val minDataPointsCount = new Unsigned64()
+  val nThreads = new Unsigned64()
+  val nTimsdataDllThreads = new Unsigned64()
+
+  def this(config: TimsDataReaderConfig, runtime: Runtime) {
+    this(runtime)
+
+    ms1Only.set(config.ms1Only)
+    mzTolPPM.set(config.mzTolPPM)
+    minDataPointsCount.set(config.minDataPointsCount)
+    nThreads.set(config.nThreads)
+    nTimsdataDllThreads.set(config.nTimsdataDllThreads)
+  }
+}
+
 trait TimsReaderLibrary {
   def timsreader_init_logger(): Unit
   def timsreader_print_text(): Unit
   def timsreader_for_each_merged_spectrum(
     timsDataDir: String,
+    cbContext: Pointer,
+    cb: OnEachFrameCallback,
+    error: PointerByReference
+  ): Int
+  def timsreader_for_each_merged_spectrum_v2(
+    timsDataDir: String,
+    config: TimsDataReaderConfigAsStruct,
     cbContext: Pointer,
     cb: OnEachFrameCallback,
     error: PointerByReference

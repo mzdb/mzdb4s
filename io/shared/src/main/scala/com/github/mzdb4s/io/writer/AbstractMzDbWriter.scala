@@ -195,6 +195,7 @@ abstract class AbstractMzDbWriter extends Logging {
         // DBO: I don't why but it doesn't work inside the previous connection
         this._connection = sf.newSQLiteConnection(dbLocation)
         this._connection.open(allowCreate = false)
+        this._connection.exec("PRAGMA foreign_keys=ON;")
         this._connection.exec(s"INSERT INTO sqlite_sequence VALUES ('spectrum',${_insertedSpectraCount});")
         this._connection.dispose()
       }
@@ -424,7 +425,7 @@ abstract class AbstractMzDbWriter extends Logging {
       val curBB = _getBBWithNextSpectrumSlice(spectrum,spectrumId,spectrumTime,msLevel,dataEnc,isolationWindowOpt)(0, 0, mzInc)
       bbFirstSpectrumId = curBB.spectrumIds.head
     } else {
-      // FIXME: min m/z should be retrieve from meta-data (scan list)
+      // FIXME: min m/z should be retrieved from meta-data (scan list)
       var curMinMz = math.round(sd.getMzAt(0) / bbSizes.BB_MZ_HEIGHT_MS1).toInt * bbSizes.BB_MZ_HEIGHT_MS1.toFloat
 
       //println(s"msLevel is $msLevel; min m/z is: $curMinMz")
@@ -1041,7 +1042,7 @@ private[writer] class RunSliceStructureFactory(runId: Int) {
 
   def getAllRunSlices(): Seq[RunSliceHeader] = {
     var runSliceNumber = 0
-    runSlicesStructure.values.groupBy(_.msLevel).toSeq.sortBy(_._1).flatMap { case (msLevel,msLevelRunSlices) =>
+    runSlicesStructure.values.groupBy(_.msLevel).toSeq.sortBy(_._2).flatMap { case (msLevel,msLevelRunSlices) =>
       msLevelRunSlices.toList.sortBy(_.id).map { runSlice =>
         runSliceNumber += 1
         runSlice.copy(number = runSliceNumber)

@@ -49,7 +49,7 @@ object DateParser {
 
   def parseIsoDate(dateStr: String): java.util.Date = {
 
-    val tm_ptr = stackalloc[time.tm]
+    val tm_ptr = stackalloc[time.tm]()
 
     string.memset(tm_ptr.asInstanceOf[Ptr[Byte]], 0, sizeof[time.time_t])
 
@@ -78,7 +78,7 @@ object DateParser {
   def dateToIsoString(date: java.util.Date): String = {
 
     Zone { implicit z =>
-      val time_ptr = alloc[time.time_t]
+      val time_ptr = alloc[time.time_t]()
       time_ptr.update(0.toUInt, date.getTime / 1000)
 
       val timePtr                = time.localtime(time_ptr)

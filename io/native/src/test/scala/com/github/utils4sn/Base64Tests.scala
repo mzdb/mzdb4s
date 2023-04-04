@@ -1,6 +1,7 @@
 package com.github.utils4sn
 
 import scala.scalanative.unsafe._
+import scala.scalanative.unsigned._
 
 import com.github.sqlite4s.c.util.CUtils
 import bindings.Base64Lib._
@@ -23,7 +24,7 @@ object Base64Tests extends TestSuite {
     println(base64Len)
 
     //val resEnc = malloc(base64Len * sizeof[CChar]).cast[CString]
-    val resEnc = alloc[CChar](base64Len)
+    val resEnc = alloc[CChar](base64Len.toULong)
 
     val retVal = encode(resEnc,cWord, wordLen)
     //println("retVal: " + retVal)
@@ -33,7 +34,7 @@ object Base64Tests extends TestSuite {
     val decodedStrLen = calcDecodedStrLen(resEnc)
     println("decodedStrLen: " + decodedStrLen)
 
-    val resDecode = alloc[CChar](decodedStrLen)
+    val resDecode = alloc[CChar](decodedStrLen.toULong)
     val actualSize = decode(resDecode, resEnc)
     println("actualSize: " + actualSize)
 

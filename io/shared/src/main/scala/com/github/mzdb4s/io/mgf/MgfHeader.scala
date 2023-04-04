@@ -3,7 +3,7 @@ package com.github.mzdb4s.io.mgf
 object MgfField extends Enumeration {
   val BEGIN_IONS = Value("BEGIN IONS")
   val END_IONS = Value("END IONS")
-  val TITLE, PEPMASS, CHARGE, RTINSECONDS, RAWSCANS, SCANS = Value
+  val TITLE, PEPMASS, CHARGE, ION_MOBILITY, RTINSECONDS, RAWSCANS, SCANS = Value
 }
 
 object MgfHeader {
