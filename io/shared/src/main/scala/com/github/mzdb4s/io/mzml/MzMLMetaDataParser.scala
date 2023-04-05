@@ -102,9 +102,13 @@ object MzMLMetaDataParser {
    */
 
   // TODO: parse scanSettingsList
-  def parseMetaData(metaDataAsXmlString: String): MzMLMetaData = {
+  def parseMetaData(metaDataAsXmlString: String): Option[MzMLMetaData] = {
 
-    val pullParser = quickxml.QuickXmlPullParser(metaDataAsXmlString)
+    val pullParser = try {
+      quickxml.QuickXmlPullParser(metaDataAsXmlString)
+    } catch {
+      case e: Exception => return None
+    }
 
     val cvParamsBuffer = new ArrayBuffer[CVParam]()
     val userParamsBuffer = new ArrayBuffer[UserParam]()
@@ -344,15 +348,17 @@ object MzMLMetaDataParser {
 
     assert(runOpt.isDefined, "can't parse 'run' tag from provided XML chunk: " + metaDataAsXmlString)
 
-    MzMLMetaData(
-      fileContent,
-      commonInstrumentParams,
-      instConfigList,
-      procMethodList,
-      Seq(runOpt.get),
-      sampleList,
-      softwareList,
-      sourceFileList
+    Some(
+      MzMLMetaData(
+        fileContent,
+        commonInstrumentParams,
+        instConfigList,
+        procMethodList,
+        Seq(runOpt.get),
+        sampleList,
+        softwareList,
+        sourceFileList
+      )
     )
   }
 

@@ -1,19 +1,19 @@
 import scala.language.postfixOps
 import scala.sys.process._
 
-lazy val scala213 = "2.13.8"
-lazy val scala211 = "2.11.12"
-lazy val supportedScalaVersions = List(scala213, scala211)
+lazy val scala213 = "2.13.10"
+lazy val scala212 = "2.12.17"
+lazy val supportedScalaVersions = List(scala213, scala212)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.4",
+  version := "0.4.5",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
   libraryDependencies ++= Seq(
-    "com.outr" %%% "scribe" % "3.6.2",
-    "com.lihaoyi" %%% "utest" % "0.7.10" % Test
+    "com.outr" %%% "scribe" % "3.6.2", // TODO: upgrade to 3.11.1 or latest
+    "com.lihaoyi" %%% "utest" % "0.8.1" % Test
   ),
 
   testFrameworks += new TestFramework("utest.runner.Framework")
@@ -55,7 +55,7 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(
     sharedJvmSettings ++ Seq(
       libraryDependencies ++= Seq(
-        "com.github.jnr" % "jnr-ffi" % "2.2.12",
+        "com.github.jnr" % "jnr-ffi" % "2.2.13",
         "com.almworks.sqlite4java" % "sqlite4java" % "1.0.392",
 
         // OS dependant SQLite library dependency
@@ -283,7 +283,7 @@ lazy val mzdb4sTools = crossProject(JVMPlatform, NativePlatform)
     crossScalaVersions := List(scala213),
 
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %%% "mainargs" % "0.2.1"
+      "com.lihaoyi" %%% "mainargs" % "0.4.0"
     ),
 
     // -- SBT assembly settings -- //

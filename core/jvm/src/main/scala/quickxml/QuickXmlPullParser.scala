@@ -51,6 +51,8 @@ class QuickXmlPullParser() extends IQuickXmlPullParser {
 
     parserPtr = quickXml.quickxml_create_pull_parser(xmlPtr)
 
+    assert(parserPtr != null, "can't create XML pull parser (invalid XML document)")
+
     this
   }
 

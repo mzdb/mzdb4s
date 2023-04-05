@@ -20,8 +20,20 @@ class QuickXmlPullParser private(xml: String) extends IQuickXmlPullParser {
   private val quickXml = QuickXmlLibrary
 
   private var xmlBytes: Array[Byte] = xml.getBytes()
-  private var xmlPtr: CString = xmlBytes.asInstanceOf[ByteArray].at(0)
-  private var parserPtr: Ptr[Byte] = quickXml.quickxml_create_pull_parser(xmlPtr)
+  private var xmlPtr: CString = {
+    val strLen = xmlBytes.length
+    val cStrPtr = scala.scalanative.libc.stdlib.malloc((strLen + 1).toULong)
+    CUtils.strcpy(cStrPtr, xmlBytes.asInstanceOf[ByteArray].at(0), strLen.toULong)
+    cStrPtr
+  }
+
+  private var parserPtr: Ptr[Byte] = {
+    val pullParserPtr = quickXml.quickxml_create_pull_parser(xmlPtr)
+
+    assert(pullParserPtr != null, "can't create XML pull parser (invalid XML document)")
+
+    pullParserPtr
+  }
 
   /*
   def parseNewDocument(xml: String): this.type = {
@@ -130,6 +142,8 @@ class QuickXmlPullParser private(xml: String) extends IQuickXmlPullParser {
   def dispose(): Unit = {
     if (parserPtr != null) {
       quickXml.quickxml_destroy_pull_parser(parserPtr)
+      scala.scalanative.libc.stdlib.free(xmlPtr)
+
       parserPtr = null
       xmlPtr = null
       xmlBytes = null

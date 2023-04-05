@@ -1,7 +1,6 @@
 package com.github.mzdb4s.io.thermo
 
 import java.io.File
-
 import com.github.mzdb4s.Logging
 import com.github.mzdb4s.db.model.params._
 import com.github.mzdb4s.db.model._
@@ -9,6 +8,8 @@ import com.github.mzdb4s.db.model.params.param._
 import com.github.mzdb4s.io.mzml._
 import com.github.mzdb4s.io.reader.param._
 import com.github.mzdb4s.msdata.{ActivationType, SpectrumHeader}
+
+import scala.collection.mutable
 
 abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extends Logging {
 
@@ -30,10 +31,16 @@ abstract class AbstractRawFileStreamer private[thermo](rawFilePath: File) extend
 
   def getMetaData(converterVersion: String): MzMLMetaData = {
 
-    // FIXME: the .Net library should return a correct XML chunk
     val xmlString = getMetaDataAsXmlString() + "/></mzML>"
 
-    val parsedMetaData = MzMLMetaDataParser.parseMetaData(xmlString)
+    val parsedMetaDataNoCheckOpt = MzMLMetaDataParser.parseMetaData(xmlString)
+    val parsedMetaData = if (parsedMetaDataNoCheckOpt.isDefined) parsedMetaDataNoCheckOpt.get
+    else {
+      logger.warn("Failed to parse the mzML meta-data, trying to remove invalid characters...")
+      val fixedXmlString = ReplaceNonUtf8Chars(xmlString)
+      val parsedMetaDataCheckedOpt = MzMLMetaDataParser.parseMetaData(fixedXmlString)
+      parsedMetaDataCheckedOpt.getOrElse(throw new Exception(s"mzML meta-data are corrupted and can't be parsed:\n$xmlString"))
+    }
 
     val softList = parsedMetaData.softwareList
     val thermoRawFileParserId = softList.find(_.name == "ThermoRawFileParser").map(_.id).getOrElse(
@@ -414,3 +421,32 @@ case class RawFileSpectrum(
   mzList: Array[Double],
   intensityList: Array[Float]
 )
+
+object ReplaceNonUtf8Chars {
+  def apply(str: String): String = {
+    val sb = new java.lang.StringBuilder(str.length)
+    val replacementCodePoint = 0xFFFD
+
+    var c = 0
+    var i = 0
+    while (i < str.length) {
+      c = str.codePointAt(i)
+      i += Character.charCount(c)
+
+      if (!isValidXMLChar(c)) sb.appendCodePoint(replacementCodePoint)
+      else sb.appendCodePoint(c)
+    }
+
+    sb.toString
+  }
+
+  def isValidXMLChar(codePoint: Int): Boolean = {
+    if (codePoint < 0x20) {
+      if (codePoint == 0x09 || codePoint == 0x0A || codePoint == 0x0D) true else false
+    }
+    else if (codePoint <= 0xD7FF) true
+    else if (codePoint >= 0xE000 && codePoint <= 0xFFFD) true
+    else if (codePoint >= 0x10000 && codePoint <= 0x10FFFF) true
+    else false
+  }
+}
