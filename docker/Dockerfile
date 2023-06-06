@@ -16,7 +16,7 @@ RUN apt install -y mono-complete
 
 ### Install mzDB Tools
 RUN mkdir mzdbtools ; cd mzdbtools; \
-    wget https://github.com/mzdb/mzdb4s/releases/download/0.4.3/mzdbtools_0.4.5_linux_x64.zip; \
+    wget https://github.com/mzdb/mzdb4s/releases/download/0.4.5/mzdbtools_0.4.5_linux_x64.zip; \
     unzip mzdbtools_0.4.5_linux_x64.zip; cd ..; \
     chmod a+x /mzdbtools/mzdbtools; \
     chmod a+x /mzdbtools/run_thermo2mzdb.sh; ln -s /mzdbtools/run_thermo2mzdb.sh /usr/bin/thermo2mzdb; \
