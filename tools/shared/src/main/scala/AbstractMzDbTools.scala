@@ -31,17 +31,27 @@ abstract class AbstractMzDbTools extends Logging {
   ): Unit = {
     logger.info("--- mzDB to MGF file converter ---")
 
-    val mzDbFile = new File(mzDbPath)
-    require(mzDbFile.isFile, s"can't find an mzDB file at: ${mzDbFile.getAbsolutePath}")
+    try {
+      val mzDbFile = new File(mzDbPath)
+      require(mzDbFile.isFile, s"can't find an mzDB file at: ${mzDbFile.getAbsolutePath}")
 
-    import com.github.mzdb4s.io.writer.MgfWriter
-    logger.info(s"Creating MGF file for mzDB located at: ${mzDbFile.getAbsolutePath}")
-    //println("Precursor m/z values will be defined using the method: " + cmd.precMzComputation)
+      import com.github.mzdb4s.io.writer.MgfWriter
+      logger.info(s"Creating MGF file for mzDB located at: ${mzDbFile.getAbsolutePath}")
+      //println("Precursor m/z values will be defined using the method: " + cmd.precMzComputation)
 
-    val writer = MgfWriter(mzDbPath,mgfFile = Some(mgfPath))
-    writer.write()
+      val writer = MgfWriter(mzDbPath,mgfFile = Some(mgfPath))
+      writer.write()
 
-    logger.info("mzDB -> MGF conversion has completed :)")
+      logger.info("mzDB -> MGF conversion has completed :)")
+
+      System.exit(0)
+    } catch {
+      case t: Throwable => {
+        logger.error("mzDB -> MGF conversion has failed :(", t)
+        System.exit(1)
+      }
+    }
+
   }
 
   protected  def _thermo2mzdb(
@@ -51,113 +61,123 @@ abstract class AbstractMzDbTools extends Logging {
   ): Unit = {
     logger.info("--- raw to mzDB file converter ---")
 
-    val rawFile = new File(rawPath)
-    require(rawFile.isFile, s"can't find a raw file at: ${rawFile.getAbsolutePath}")
+    try {
 
-    val mzDbFile = new File(mzDbPath)
-    // Note: the requirement is now postponed after the FAIMS check (see below)
-    //require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
+      val rawFile = new File(rawPath)
+      require(rawFile.isFile, s"can't find a raw file at: ${rawFile.getAbsolutePath}")
 
-    val wrapper = RawFileParserWrapper
-    wrapper.initialize(new File(NATIVE_LIB_DIR, "rawfileparser").getCanonicalPath)
-    //wrapper.initialize(NATIVE_LIB_DIR_PATH)
+      val mzDbFile = new File(mzDbPath)
+      // Note: the requirement is now postponed after the FAIMS check (see below)
+      //require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
 
-    // FIXME: determine the ByteOrder
-    val bo = java.nio.ByteOrder.LITTLE_ENDIAN
+      val wrapper = RawFileParserWrapper
+      wrapper.initialize(new File(NATIVE_LIB_DIR, "rawfileparser").getCanonicalPath)
+      //wrapper.initialize(NATIVE_LIB_DIR_PATH)
 
-    //val profileHighResDE = DataEncoding(id = 1, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
-    //val profileLowResDE = DataEncoding(id = 2, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
-    val centroidedHighResDE = DataEncoding(id = 3, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
-    //val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
+      // FIXME: determine the ByteOrder
+      val bo = java.nio.ByteOrder.LITTLE_ENDIAN
 
-    implicit val sf: ISQLiteFactory = SQLiteFactory
+      //val profileHighResDE = DataEncoding(id = 1, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
+      //val profileLowResDE = DataEncoding(id = 2, mode = DataMode.PROFILE, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
+      val centroidedHighResDE = DataEncoding(id = 3, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.HIGH_RES_PEAK, compression = "none", byteOrder = bo)
+      //val centroidedLowResDE = DataEncoding(id = 4, mode = DataMode.CENTROID, peakEncoding = PeakEncoding.LOW_RES_PEAK, compression = "none", byteOrder = bo)
 
-    logger.info(s"Opening raw file located at: ${rawFile.getAbsolutePath}")
+      implicit val sf: ISQLiteFactory = SQLiteFactory
 
-    // Open the raw file to perform the conversion
-    val rawFileStreamer = wrapper.getRawFileStreamer(rawPath)
+      logger.info(s"Opening raw file located at: ${rawFile.getAbsolutePath}")
 
-    // FIXME: this is a hack, we inject here the pwiz-mzdb version for mzdb-access backward compat, we should update mzdb-access
-    val mzMLMetaData = rawFileStreamer.getMetaData("0.9.10") // TODO: manage with SBT
+      // Open the raw file to perform the conversion
+      val rawFileStreamer = wrapper.getRawFileStreamer(rawPath)
 
-    val mzDbMetaData = mzMLMetaData.toMzDbMetaData(
-      mzDbHeader = new MzDbHeader(
-        version = "0.7",
-        creationTimestamp = new java.util.Date().getTime.toInt / 1000,
-        mzMLMetaData.fileContent,
-        paramTree = ParamTree()
-      ),
-      dataEncodings = Seq.empty[DataEncoding] // should be determined dynamically
-    )
+      // FIXME: this is a hack, we inject here the pwiz-mzdb version for mzdb-access backward compat, we should update mzdb-access
+      val mzMLMetaData = rawFileStreamer.getMetaData("0.9.10") // TODO: manage with SBT
 
-    def createMzDbWriter(outputFile: File): MzDbWriter = {
-      require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${outputFile.getAbsolutePath}")
-
-      logger.info(s"Writing mzDB file located at: ${outputFile.getAbsolutePath}")
-
-      val mzDbWriter = new MzDbWriter(
-        outputFile,
-        mzDbMetaData,
-        DefaultBBSizes(),
-        isDIA = false // FIXME: we should infer this
+      val mzDbMetaData = mzMLMetaData.toMzDbMetaData(
+        mzDbHeader = new MzDbHeader(
+          version = "0.7",
+          creationTimestamp = new java.util.Date().getTime.toInt / 1000,
+          mzMLMetaData.fileContent,
+          paramTree = ParamTree()
+        ),
+        dataEncodings = Seq.empty[DataEncoding] // should be determined dynamically
       )
-      mzDbWriter.open()
 
-      mzDbWriter
-    }
+      def createMzDbWriter(outputFile: File): MzDbWriter = {
+        require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${outputFile.getAbsolutePath}")
 
-    var singleMzDbWriterOpt = Option.empty[MzDbWriter]
-    val mzDbWriterByFaimsCv = new collection.mutable.HashMap[Double, MzDbWriter]
+        logger.info(s"Writing mzDB file located at: ${outputFile.getAbsolutePath}")
 
-    if (!splitFaims) {
-      singleMzDbWriterOpt = Some(createMzDbWriter(mzDbFile))
-    }
+        val mzDbWriter = new MzDbWriter(
+          outputFile,
+          mzDbMetaData,
+          DefaultBBSizes(),
+          isDIA = false // FIXME: we should infer this
+        )
+        mzDbWriter.open()
 
-    logger.info("Reading spectra from raw file...")
+        mzDbWriter
+      }
 
-    rawFileStreamer.forEachSpectrum { spectrum =>
-
-      val mzDbSpectrumData = new SpectrumData(spectrum.mzList, spectrum.intensityList)
-      val mzDbSpectrum = com.github.mzdb4s.msdata.Spectrum(spectrum.header, mzDbSpectrumData)
+      var singleMzDbWriterOpt = Option.empty[MzDbWriter]
+      val mzDbWriterByFaimsCv = new collection.mutable.HashMap[Double, MzDbWriter]
 
       if (!splitFaims) {
-        singleMzDbWriterOpt.get.insertSpectrum(mzDbSpectrum, spectrum.xmlMetaData, centroidedHighResDE)
-      } else {
-        val filterStringCvParam = spectrum.header.getScanList.getScans().head.getCVParam(PsiMsCV.FILTER_STRING)
+        singleMzDbWriterOpt = Some(createMzDbWriter(mzDbFile))
+      }
 
-        var inserted = false // Ensure we don't insert the same spectrum twice
-        for (
-          subStr <- filterStringCvParam.value.split(' ')
-          if subStr.length > 3 && subStr.charAt(0) == 'c' && subStr.charAt(1) == 'v' && ! inserted
-        ) {
-          val faimsCv = subStr.split('=')(1).toFloat
-          val mzDbFileNameParts = mzDbFile.getName.split('.')
-          mzDbFileNameParts(0) = mzDbFileNameParts(0) + "_CV" + (-faimsCv).toInt
-          val faimsMzDbFile = new File(mzDbFile.getParentFile, mzDbFileNameParts.mkString("."))
+      logger.info("Reading spectra from raw file...")
 
-          val mzDbWriter = mzDbWriterByFaimsCv.getOrElseUpdate(faimsCv, createMzDbWriter(faimsMzDbFile))
-          mzDbWriter.insertSpectrum(mzDbSpectrum, spectrum.xmlMetaData, centroidedHighResDE)
+      rawFileStreamer.forEachSpectrum { spectrum =>
 
-          inserted = true
+        val mzDbSpectrumData = new SpectrumData(spectrum.mzList, spectrum.intensityList)
+        val mzDbSpectrum = com.github.mzdb4s.msdata.Spectrum(spectrum.header, mzDbSpectrumData)
+
+        if (!splitFaims) {
+          singleMzDbWriterOpt.get.insertSpectrum(mzDbSpectrum, spectrum.xmlMetaData, centroidedHighResDE)
+        } else {
+          val filterStringCvParam = spectrum.header.getScanList.getScans().head.getCVParam(PsiMsCV.FILTER_STRING)
+
+          var inserted = false // Ensure we don't insert the same spectrum twice
+          for (
+            subStr <- filterStringCvParam.value.split(' ')
+            if subStr.length > 3 && subStr.charAt(0) == 'c' && subStr.charAt(1) == 'v' && ! inserted
+          ) {
+            val faimsCv = subStr.split('=')(1).toFloat
+            val mzDbFileNameParts = mzDbFile.getName.split('.')
+            mzDbFileNameParts(0) = mzDbFileNameParts(0) + "_CV" + (-faimsCv).toInt
+            val faimsMzDbFile = new File(mzDbFile.getParentFile, mzDbFileNameParts.mkString("."))
+
+            val mzDbWriter = mzDbWriterByFaimsCv.getOrElseUpdate(faimsCv, createMzDbWriter(faimsMzDbFile))
+            mzDbWriter.insertSpectrum(mzDbSpectrum, spectrum.xmlMetaData, centroidedHighResDE)
+
+            inserted = true
+          }
         }
+
+        if (spectrum.header.id % 1000 == 0) {
+          logger.debug(s"Processed ${spectrum.header.id} spectra...")
+        }
+
+        true
       }
 
-      if (spectrum.header.id % 1000 == 0) {
-        logger.debug(s"Processed ${spectrum.header.id} spectra...")
+      if (!splitFaims) {
+        logger.debug("Closing mzDB writer...")
+        singleMzDbWriterOpt.get.close()
+      } else {
+        logger.debug("Closing FAIMS mzDB writers...")
+        mzDbWriterByFaimsCv.values.foreach(_.close())
       }
 
-      true
-    }
+      logger.info("raw -> mzDB conversion has completed :)")
 
-    if (!splitFaims) {
-      logger.debug("Closing mzDB writer...")
-      singleMzDbWriterOpt.get.close()
-    } else {
-      logger.debug("Closing FAIMS mzDB writers...")
-      mzDbWriterByFaimsCv.values.foreach(_.close())
+      System.exit(0)
+    } catch {
+      case t: Throwable => {
+        logger.error("raw -> mzDB conversion has failed :(", t)
+        System.exit(1)
+      }
     }
-
-    logger.info("raw -> mzDB conversion has completed :)")
   }
 
   protected  def _tdf2mzdb(
@@ -171,23 +191,32 @@ abstract class AbstractMzDbTools extends Logging {
 
     logger.info("--- TDF to mzDB file converter ---")
 
-    require(new File(tdfDir).isDirectory, s"can't find a directory at: $tdfDir")
-    require(new File(tdfDir,"analysis.tdf").isFile, s"can't find an 'analysis.tdf' file in the directory: $tdfDir")
+    try {
+      require(new File(tdfDir).isDirectory, s"can't find a directory at: $tdfDir")
+      require(new File(tdfDir,"analysis.tdf").isFile, s"can't find an 'analysis.tdf' file in the directory: $tdfDir")
 
-    val mzDbFile = new File(mzDbPath)
-    require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
+      val mzDbFile = new File(mzDbPath)
+      require(!mzDbFile.exists(), s"can't create mzDB file because it already exists at: ${mzDbFile.getAbsolutePath}")
 
-    logger.info(s"Writing mzDB file located at: ${mzDbFile.getAbsolutePath}")
+      logger.info(s"Writing mzDB file located at: ${mzDbFile.getAbsolutePath}")
 
-    implicit val sf = SQLiteFactory
-    implicit val reader = TimsDataReader
+      implicit val sf = SQLiteFactory
+      implicit val reader = TimsDataReader
 
-    TimsReaderLibraryFactory.initLogger()
+      TimsReaderLibraryFactory.initLogger()
 
-    val converter = new TimsData2MzDb(tdfDir, mzDbPath, config)
-    converter.convert()
+      val converter = new TimsData2MzDb(tdfDir, mzDbPath, config)
+      converter.convert()
 
-    logger.info("TDF -> mzDB conversion has completed :)")
+      logger.info("TDF -> mzDB conversion has completed :)")
+
+      System.exit(0)
+    } catch {
+      case t: Throwable => {
+        logger.error("TDF -> mzDB conversion has failed :(", t)
+        System.exit(1)
+      }
+    }
   }
 
 }
