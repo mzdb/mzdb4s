@@ -13,6 +13,7 @@ import com.github.mzdb4s.io.reader.MgfReader
 import com.github.mzdb4s.io.writer.MzDbWriter
 import com.github.mzdb4s.msdata._
 import com.github.mzdb4s.util.collection._
+import com.github.mzdb4s.util.lang.String._
 import com.github.mzdb4s.util.ms.MsUtils
 import com.github.sqlite4s.ISQLiteFactory
 
@@ -78,21 +79,20 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
   //private val RT_EPSILON = 0.05f
 
   // Sort spectra by increasing RT
-  private val _spectraQueue = scala.collection.mutable.PriorityQueue[Spectrum]()(Ordering.by[Spectrum, Float](_.header.time).reverse)
+  /*private val _spectraQueue = scala.collection.mutable.PriorityQueue[Spectrum]()(Ordering.by[Spectrum, Float](_.header.time).reverse)
   private var _queueLastSpectrumId = 0
   private var _queueLastCycle = 0
-  private val _SPECTRA_QUEUE_MIN_SIZE = 100
+  private val _SPECTRA_QUEUE_MIN_SIZE = 100*/
 
   def convert(): Unit = {
 
-    _spectraQueue.clear()
+    /*_spectraQueue.clear()
     _queueLastSpectrumId = 0
-    _queueLastCycle = 0
+    _queueLastCycle = 0*/
 
     //val siblingMzTolPPM = config.map(_.mzTolPPM).getOrElse(10)
     val peakClusterMzTolPPM = config.map(_.mzTolPPM).getOrElse(10)
 
-    //val writtenPrecById = new collection.mutable.LongMap[Boolean] // only used of MGF file loaded
     var writer: MzDbWriter = null
 
     try {
@@ -106,8 +106,8 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
       )
       writer.open()
 
-      val mgfSpectraByParentFrameId = new collection.mutable.LongMap[ArrayBuffer[(String,Double,Int,Float,Array[Double],Array[Float])]]
-      //val mgfSpectrumDataByPrecId = new collection.mutable.LongMap[(Double,Int,Array[Double],Array[Float])]
+      //val mgfSpectraByParentFrameId = new collection.mutable.LongMap[ArrayBuffer[(String,Double,Int,Float,Array[Double],Array[Float])]]
+      val mgfSpectraByParentFrameId = new collection.mutable.LongMap[ArrayBuffer[(String,Double,Int,Float)]]
 
       val mgfFileStrOpt = timsDataDir.list().find(_.endsWith(".mgf"))
       val mgfFileExists = mgfFileStrOpt.isDefined
@@ -117,28 +117,12 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
 
         logger.debug(s"Loading MS/MS spectra from MGF file '$mgfFileStr'")
 
-        val mgfReader = new MgfReader(new File(timsDataDir,mgfFileStr), 1024 * 1024)
+        val mgfReader = new MgfReader(new File(timsDataDir,mgfFileStr), 1024 * 1024, peakSeparator = '\t')
 
-        mgfReader.foreachMgfSpectrum { spectrum =>
-
-          /*
-          val title = spectrum.mgfHeader.entries.find(_.field == MgfField.TITLE).get.value.toString
-          val len = title.length
-
-          val cmpId = new StringBuffer()
-          var j = 0
-          while (j < len) {
-            val char = title(j)
-            if (char == ',') j = len
-            else if (char.isDigit) {
-              cmpId.append(char)
-            }
-            j += 1
-          }
-          */
+        mgfReader.foreachMgfHeader { mgfSpectrumHeader =>
 
           // FIXME: in older Tims MGF files the RAWSCANS field is absent => we should implement a fallback
-          val rawScansStr = spectrum.mgfHeader.entries.find(_.field == MgfField.RAWSCANS).get.value.toString
+          val rawScansStr = mgfSpectrumHeader.entries.find(_.field == MgfField.RAWSCANS).get.value.toString
           val rawScansStrLen = rawScansStr.length
 
           val parentMsFrameId = new StringBuffer()
@@ -153,7 +137,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
             }
           }
 
-          val mgfHeaderEntries = spectrum.mgfHeader.entries
+          val mgfHeaderEntries = mgfSpectrumHeader.entries
           var specTitle: String = ""
           var pepMass: Double = 0.0
           var pepCharge: Int = 0
@@ -162,40 +146,27 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
           mgfHeaderEntries.foreach { mgfHeaderEntry =>
             mgfHeaderEntry.field match {
               case MgfField.TITLE => specTitle = mgfHeaderEntry.value.toString
-              case MgfField.PEPMASS => pepMass = mgfHeaderEntry.value.toString.split("\\s").head.toDouble
+              //case MgfField.PEPMASS => pepMass = mgfHeaderEntry.value.toString.split("\\s").head.toDouble
+              case MgfField.PEPMASS => pepMass = {
+                val pepMassData = mgfHeaderEntry.value.toString
+                val pepMassStr = if (pepMassData.contains(' ')) pepMassData.lazySplit(' ').head
+                else if (pepMassData.contains('\t')) pepMassData.lazySplit('\t').head
+                else pepMassData
+                pepMassStr.toDouble
+              }
               case MgfField.CHARGE => pepCharge = mgfHeaderEntry.value.toString.takeWhile(_ != '+').toInt
-              case MgfField.RTINSECONDS => rtInSeconds = mgfHeaderEntry.value.toString.toFloat
+              case MgfField.RTINSECONDS => rtInSeconds = mgfHeaderEntry.value.toString.trim.toFloat
               case _ => {}
             }
           }
-          //val specTitle = mgfHeaderEntries.find(_.field == MgfField.TITLE).get.value.toString
-          //val pepCharge = mgfHeaderEntries.find(_.field == MgfField.CHARGE).map(_.value.toString.takeWhile(_ != '+').toInt).getOrElse(0)
-          //val pepMassStr = mgfHeaderEntries.find(_.field == MgfField.PEPMASS).get.value.toString
-          //val pepMass = pepMassStr.split("\\s").head.toDouble
-
-          /*val precsOpt = precsByParentFrameId.get(parentMsFrameId.toString.toInt)
-          assert(precsOpt.isDefined,s"can't find precursors for MS frame with ID=$parentMsFrameId")
-
-          val precs = precsOpt.get
-
-          val nearestPrec = precs.minBy(s => math.abs(s.mz - pepMass))
-          if (math.abs(nearestPrec.mz - pepMass) > 0.5) {
-            logger.warn(s"can't find a precursor of mass=$pepMass (z=$pepCharge) for MS frame with ID=$parentMsFrameId")
-          } else if (mgfSpectrumDataByPrecId.contains(nearestPrec.id)) {
-            logger.warn(s"precursor with id=${nearestPrec.id} already mapped, current mass=$pepMass (z=$pepCharge), MS frame with ID=$parentMsFrameId")
-          } else {
-            mgfSpectrumDataByPrecId.put(
-              nearestPrec.id,
-              (pepMass, pepCharge, spectrum.mzList,spectrum.intensityList)
-            )
-          }*/
 
           mgfSpectraByParentFrameId.getOrElseUpdate(
             parentMsFrameId.toString.toLong,
-            new ArrayBuffer[(String,Double,Int,Float,Array[Double],Array[Float])]
-          ) += Tuple6(specTitle,pepMass,pepCharge,rtInSeconds,spectrum.mzList,spectrum.intensityList)
+            //new ArrayBuffer[(String,Double,Int,Float,Array[Double],Array[Float])]
+            new ArrayBuffer[(String,Double,Int,Float)]
+          ) += Tuple4(specTitle,pepMass,pepCharge,rtInSeconds)
 
-          true // continue loading spectra
+          true
         }
 
         logger.debug(s"MGF file '$mgfFileStr' fully loaded!")
@@ -203,20 +174,22 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
 
       val frameById = tdfReader.getAllFrames().mapByLong(_.id)
       val precById = tdfReader.getAllPrecursors().mapByLong(_.id)
-      //val precsByParentFrameId = tdfReader.getAllPrecursors().groupByLong(_.parentFrameId)
       //val msmsScansByFrameId = tdfReader.getAllMsMsScans().groupByLong(_.frameId)
       val pasefScansByFrameIdAndFirstScan = tdfReader.getAllPasefMsMsScans().map( ps => (ps.frameId,ps.scanMin) -> ps).toMap
 
       import MsType._
 
-      var spId = 0 // Sprectrum ID starts at 1, will be incremented on creation
-      var cycle = 0 //VDS : TODO 1 cycle = 1Ms + xMSMS ?
+      var spId = 0
+      var cycle = 0
+
+      var cycleSpIdx = 0
+      val cycleSpIdxByFrameId = new collection.mutable.LongMap[Int]
 
       def _createPasefSpectrumHeader(
         title: String,
         time: Float,
-        mzValues: Array[Double],
-        intensityValues: Array[Float],
+        mzValues: collection.IndexedSeq[Double],
+        intensityValues: collection.IndexedSeq[Float],
         precursorMz: Option[Double],
         precursorCharge: Option[Int]
       ): SpectrumHeader = {
@@ -247,21 +220,32 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
 
       logger.info("Reading and processing spectra from TDF file...")
 
-      tdr.forEachMergedSpectrum(timsDataDirPath, config, { (frameId: Long, firstScan: Int, lastScan: Int, _mzValues: Array[Double], _intensityValues: Array[Float]) =>
+      /*tdr.forEachMergedSpectrum(timsDataDirPath, config, { (frameId: Long, firstScan: Int, lastScan: Int, _mzValues: Array[Double], _intensityValues: Array[Float]) =>
+        println("oki 2")
+      })*/
 
-        val frame = frameById(frameId)
+      tdr.forEachMergedSpectrum(timsDataDirPath, config, { (frameId: Long, firstScan: Int, lastScan: Int, spectrumIdx: Int, _mzValues: IndexedSeq[Double], _intensityValues: IndexedSeq[Float]) =>
+
+        //println(s"frameId = $frameId, firstScan = $firstScan, lastScan = $lastScan")
+        //println(s"_mzValues.length = ${_mzValues.length}, _intensityValues.length = ${_intensityValues.length}")
+
+        val frame = frameById.getOrElse(
+          frameId,
+          throw new AssertionError(
+            s"can't find frame with ID=$frameId"
+          )
+        )
         //var precMzOpt = Option.empty[Double]
         //var precChargeOpt = Option.empty[Int]
 
-        // Post-processing of detected peaks (workaround for missing proper peak-picker in rust code)
-        val (mzValues, intensityValues) = if (frame.msType == MS || !mgfFileExists) {
+        val (mzValues, intensityValues) = (_mzValues, _intensityValues)
+
+        // OLD Post-processing of detected peaks (workaround for missing proper peak-picker in Rust code)
+        /*val (mzValues, intensityValues) = if ((frame.msType == MS && firstScan == 0) || !mgfFileExists) {
           //(_mzValues, _intensityValues)
 
-          /*if (frame.id == 10235)
-            println(_mzValues.toList)*/
-
-          val sortedIndexedIntensities = _intensityValues.zipWithIndex.sortBy(- _._1)
           val initialPeaksCount = _mzValues.length
+          val sortedIndexedIntensities = _intensityValues.zipWithIndex.sortBy(- _._1)
 
           val curAggregatedPeaks = new ArrayBuffer[(Double,Float)]
           val filteredPeaks = new ArrayBuffer[(Double,Float)]
@@ -272,7 +256,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
             curAggregatedPeaks += Tuple2(mz, intensity)
             usedPeakIndices.put(curPeakIdx,true)
 
-            var siblingMz = mz
+            //var siblingMz = mz
             var peakIdx = curPeakIdx + 1
             var hasNextPeaks = true
             while (hasNextPeaks && peakIdx < initialPeaksCount) {
@@ -284,25 +268,25 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
               else {
                 curAggregatedPeaks += Tuple2(nextPeakMz, _intensityValues(peakIdx))
                 usedPeakIndices.put(peakIdx,true)
-                siblingMz = nextPeakMz
+                //siblingMz = nextPeakMz
               }
 
               peakIdx += 1
             }
 
-            siblingMz = mz
+            //siblingMz = mz
             peakIdx = curPeakIdx - 1
             var hasPrevPeaks = true
             while (hasPrevPeaks && peakIdx >= 0) {
               val prevPeakMz = _mzValues(peakIdx)
-              val siblingMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(siblingMz - prevPeakMz))
+              //val siblingMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(siblingMz - prevPeakMz))
               val clusterMzDiffPPM = MsUtils.DaToPPM(mz, math.abs(mz - prevPeakMz))
 
               if (clusterMzDiffPPM > peakClusterMzTolPPM) hasPrevPeaks = false
               else {
                 curAggregatedPeaks += Tuple2(prevPeakMz, _intensityValues(peakIdx))
                 usedPeakIndices.put(peakIdx,true)
-                siblingMz = prevPeakMz
+                //siblingMz = prevPeakMz
               }
 
               peakIdx -= 1
@@ -334,9 +318,17 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
             println(mzValuesBuf.toList)
           }*/
 
-          (mzValuesBuf.toArray, intensityValuesBuf.toArray)
+          /*for ((k,v) <- mzValuesBuf.zip(intensityValuesBuf)) {
+            println(k,v)
+          }*/
 
-        } /*else if (frame.msType == PASEF) {
+          (mzValuesBuf, intensityValuesBuf)
+
+        } else {
+          (_mzValues, _intensityValues)
+        }*/
+
+        /*else if (frame.msType == PASEF) {
 
           if (!mgfFileExists) (_mzValues, _intensityValues)
           else {
@@ -381,9 +373,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
               }
             }*/
           }
-        } */ else {
-          (_mzValues, _intensityValues)
-        }
+        }*/
 
         val frameRT = frame.time
         val peaksCount = mzValues.length
@@ -396,32 +386,78 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
 
           frame.msType match {
             case MS => { // Ms Frame
-              //println("MS")
 
-              spId += 1
-              cycle += 1
+              if (firstScan == 0) {
+                cycle += 1
+                cycleSpIdx = spectrumIdx
+                cycleSpIdxByFrameId.put(frameId, cycleSpIdx)
 
-              val (basePeakIdx, maxIntensity) = _findBasePeakIndex(intensityValues)
-              val basedPeakMz = mzValues(basePeakIdx)
+                //println("MS peaksCount = " + peaksCount)
 
-              Some(SpectrumHeader(
-                id = spId,
-                initialId = spId,
-                title = s"Frame=$frameId",
-                cycle = cycle,
-                time = frameRT,
-                msLevel = 1,
-                activationType = None,
-                peaksCount = peaksCount,
-                isHighResolution = true,
-                tic = intensityValues.sum,
-                basePeakMz = basedPeakMz,
-                basePeakIntensity = maxIntensity,
-                precursorMz = None,
-                precursorCharge = None,
-                spId,
-                precursor = null
-              ))
+                /*
+                if (cycle % 100 == 0 ) {
+                  println("Reached new cycle: " + cycle)
+                }*/
+
+                val (basePeakIdx, maxIntensity) = _findBasePeakIndex(intensityValues)
+                val basedPeakMz = mzValues(basePeakIdx)
+
+                spId += 1
+                Some(SpectrumHeader(
+                  id = spId,
+                  initialId = spId,
+                  title = s"Frame=$frameId",
+                  cycle = cycle,
+                  time = frameRT,
+                  msLevel = 1,
+                  activationType = None,
+                  peaksCount = peaksCount,
+                  isHighResolution = true,
+                  tic = intensityValues.sum,
+                  basePeakMz = basedPeakMz,
+                  basePeakIntensity = maxIntensity,
+                  precursorMz = None,
+                  precursorCharge = None,
+                  spId,
+                  precursor = null
+                ))
+              } else {
+                assert(mgfFileExists, "unexpected spectrum type (MS frame with firstScan > 0 requires an MGF file)")
+
+                //println("frame ID is : " + frameId)
+
+                val mgfSpectraOpt = mgfSpectraByParentFrameId.get(frameId)
+                if (mgfSpectraOpt.isEmpty) None
+                else {
+                  val mgfSpectra = mgfSpectraOpt.get
+                  //assert(cycleSpIdx < mgfSpectra.length, "can't map MGF spectra with current stream of spectra")
+
+                  val msSpIdx = cycleSpIdxByFrameId(frameId)
+                  //println("cycleSpIdx = " + msSpIdx)
+                  //println("spectrumIdx = " + spectrumIdx)
+                  val specIdxOffset = spectrumIdx - msSpIdx - 1
+                  assert(
+                    specIdxOffset >= 0 && specIdxOffset < mgfSpectra.length,
+                    s"invalid MGF spectrum offset ($specIdxOffset), cycleSpIdx = $msSpIdx, spectrumIdx = $spectrumIdx"
+                  )
+
+                  val mgfSpectrum = mgfSpectra(specIdxOffset)
+
+                  val specHeader = _createPasefSpectrumHeader(
+                    title = mgfSpectrum._1,
+                    time = mgfSpectrum._4 + (specIdxOffset.toFloat / 1000),
+                    mzValues = mzValues,
+                    intensityValues = intensityValues,
+                    precursorMz = Some(mgfSpectrum._2),
+                    precursorCharge = Some(mgfSpectrum._3)
+                  )
+
+                  //_insertSpectrum(writer, specHeader, mzValues, intensityValues)
+
+                  Some(specHeader)
+                }
+              }
+
             }
             /*case MSMS => {
 
@@ -476,7 +512,8 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
           _insertSpectrum(writer, shOpt.get, mzValues, intensityValues)
         }
 
-        if (mgfFileExists && frame.msType == MS) {
+        /*
+        if (mgfFileExists && frame.msType == MS && frame) {
           val mgfSpectraOpt = mgfSpectraByParentFrameId.get(frameId)
           if (mgfSpectraOpt.nonEmpty) {
             val mgfSpectra = mgfSpectraOpt.get.sortBy(_._4) // sort by ASC RT
@@ -485,6 +522,8 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
             mgfSpectra.foreach { mgfSpectrum =>
               val mzValues = mgfSpectrum._5
               val intensityValues = mgfSpectrum._6
+              //println("MGF spectrum m/z count = " + mzValues.length)
+              //println("MGF spectrum intensity count = " + intensityValues.length)
 
               val specHeader = _createPasefSpectrumHeader(
                 title = mgfSpectrum._1,
@@ -501,14 +540,15 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
               tmpIdx += 1
             }
           }
-        } // ends if (mgfFileExists && frame.msType == MS)
+        } // ends if (mgfFileExists && frame.msType == MS)*/
 
       }) // ends forEachMergedSpectrum
 
+      /*
       // Dequeue the remaining list of cached and re-ordered spectra
       while (_spectraQueue.nonEmpty) {
         _dequeueSpectrum(writer)
-      }
+      }*/
 
     } finally {
       if (writer != null) {
@@ -520,7 +560,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
 
   }
 
-  private def _findBasePeakIndex(intensityValues: Array[Float]): (Int,Float) = {
+  private def _findBasePeakIndex(intensityValues: collection.IndexedSeq[Float]): (Int,Float) = {
 
     val peaksCount = intensityValues.length
 
@@ -542,19 +582,32 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
     (basePeakIdx, maxIntensity)
   }
 
-  def _insertSpectrum(writer: MzDbWriter, sh: SpectrumHeader, mzValues: Array[Double], intensityValues: Array[Float]): Unit = {
+  def _insertSpectrum(
+    writer: MzDbWriter,
+    sh: SpectrumHeader,
+    mzValues: collection.IndexedSeq[Double],
+    intensityValues: collection.IndexedSeq[Float]
+  ): Unit = {
 
+    val spId = sh.id
     val spData = new SpectrumData(mzValues, intensityValues)
     val mzdb4sSp = Spectrum(sh, spData)
 
-    _spectraQueue += mzdb4sSp
+    val spectrumMetaData = SpectrumXmlMetaData(spId, "", "", None, None)
+    writer.insertSpectrum(mzdb4sSp, spectrumMetaData, centroidDataEncoding)
+
+    if (spId % 1000 == 0) {
+      logger.debug(s"Processed $spId spectra...")
+    }
+
+    /*_spectraQueue += mzdb4sSp
 
     if (_spectraQueue.length >= _SPECTRA_QUEUE_MIN_SIZE) {
       _dequeueSpectrum(writer)
-    }
+    }*/
   }
 
-  private def _dequeueSpectrum(writer: MzDbWriter): Unit = {
+  /*private def _dequeueSpectrum(writer: MzDbWriter): Unit = {
     val cachedSp = _spectraQueue.dequeue()
 
     _queueLastSpectrumId += 1
@@ -579,7 +632,7 @@ class TimsData2MzDb(timsDataDirPath: String, mzDbFilePath: String, config: Optio
     if (spId % 1000 == 0) {
       logger.debug(s"Processed $spId spectra...")
     }
-  }
+  }*/
 
   /*
   private def fillmzDBPrecursor(mzdbPrecursor: Nothing, timstofPrecursor: Nothing, collEnergy: String): Unit = {

@@ -18,6 +18,20 @@ trait OnEachFrameCallback {
   //@Delegate def onResult(frameId: Long, @size_t peaksCount: Int, @Out mzValues: Array[Double], @Out intensityValues: Array[Float]): Unit
 }
 
+trait OnEachFrameCallbackV2 {
+
+  @Delegate def onResult(
+    frameId: Long,
+    @size_t firstScan: Int,
+    @size_t lastScan: Int,
+    @size_t spectrumIdx: Int,
+    @Out mzValues: Pointer,
+    @Out intensityValues: Pointer,
+    @size_t peaksCount: Int,
+    context: Pointer
+  ): Unit
+}
+
 /*final class TimsReaderError(val runtime: Runtime) extends Struct(runtime) {
   final val code = new Signed32()
   final val message = new String()
@@ -54,7 +68,7 @@ trait TimsReaderLibrary {
     timsDataDir: String,
     config: TimsDataReaderConfigAsStruct,
     cbContext: Pointer,
-    cb: OnEachFrameCallback,
+    cb: OnEachFrameCallbackV2,
     error: PointerByReference
   ): Int
 }

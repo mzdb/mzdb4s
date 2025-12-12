@@ -19,15 +19,16 @@ object Logging {
   val LogLevel = com.github.mzdb4s.LogLevel
 
   private val namespace = "com.github.mzdb4s"
+  private val sqlite4sNamespace = "com.github.sqlite4s"
   private var MAX_LOG_LEVEL: LogLevel = LogLevel.DEBUG
 
   // Implementation of logger config function for scribe (https://github.com/outr/scribe/wiki/getting-started)
   // See: http://www.matthicks.com/2018/02/scribe-2-fastest-jvm-logger-in-world.html
-  def configureLogger(minLogLevel: Logging.LogLevel = LogLevel.DEBUG): Unit = {
-    MAX_LOG_LEVEL = minLogLevel
+  def configureLogger(maxLogLevel: Logging.LogLevel = LogLevel.DEBUG): Unit = {
+    MAX_LOG_LEVEL = maxLogLevel
 
     // set log level, e.g. to DEBUG
-    val scribeMinLogLevelOpt = Option(minLogLevel match {
+    val scribeMinLogLevelOpt = Option(maxLogLevel match {
       case LogLevel.OFF => null
       case LogLevel.ERROR => Level.Error
       case LogLevel.WARN => Level.Warn
@@ -36,12 +37,12 @@ object Logging {
       case LogLevel.TRACE => Level.Trace
     })
 
-    val logger = scribe.Logger.root.clearHandlers().clearModifiers().withHandler(
+    /*val logger = scribe.Logger.root.clearHandlers().clearModifiers().withHandler(
       minimumLevel = scribeMinLogLevelOpt,
       outputFormat = ASCIIOutputFormat
     )
 
-    if (scribeMinLogLevelOpt.isDefined) {
+    this.logger = if (scribeMinLogLevelOpt.isDefined) {
       logger.withModifier(
         select(packageName.startsWith(namespace))
           .exclude(level < scribeMinLogLevelOpt.get)
@@ -53,6 +54,53 @@ object Logging {
           .exclude(level <= Level.Error)
           .priority(Priority.High)
       ).replace()
+    }*/
+
+    // FIXME: we should use orpan() loggers defined by name/package
+    // See: https://github.com/outr/scribe/issues/463#issuecomment-1580945299
+
+    // Configure the global root logger
+    if (scribeMinLogLevelOpt.isEmpty) {
+      scribe.Logger.root.clearHandlers().clearModifiers().replace()
+    } else {
+      scribe.Logger.root.clearHandlers().clearModifiers().withHandler(
+        minimumLevel = scribeMinLogLevelOpt,
+        outputFormat = ASCIIOutputFormat,
+        writer = scribe.writer.SystemErrWriter,
+        modifiers = List(
+          select(packageName(namespace))
+            .include(level === Level.Error)
+            .excludeUnselected
+        )
+      )
+      .withHandler(
+        minimumLevel = scribeMinLogLevelOpt,
+        outputFormat = ASCIIOutputFormat,
+        writer = scribe.writer.SystemOutWriter,
+        modifiers = List(
+          select(packageName(namespace))
+            .include(level < Level.Error)
+        )
+      )/*.withHandler(
+        minimumLevel = None,
+        writer = scribe.writer.NullWriter,
+        modifiers = List(select(packageName(sqlite4sNamespace)).priority(Priority.High))
+      )*//*.withHandler(
+        minimumLevel = None,
+        modifiers = List(
+          select(packageName(sqlite4sNamespace))
+            .include(level === Level.Fatal)
+            .excludeUnselected
+            .priority(Priority.High)
+        )
+      )*//*.withHandler(
+        minimumLevel = Some(Level.Fatal),
+        modifiers = List(
+          select(packageName.startsWith(sqlite4sNamespace))
+            .include(level === Level.Fatal)
+            .excludeUnselected
+        )
+      )*/.replace()
     }
 
   }

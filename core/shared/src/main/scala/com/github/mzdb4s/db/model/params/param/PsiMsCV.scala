@@ -19,6 +19,8 @@ object PsiMsCV extends Enumeration {
   val SAMPLE_NAME = Term("MS:1000002")
   val SAMPLE_NUMBER = Term("MS:1000001")
   val SCAN_START_TIME = Term("MS:1000016")
+  val SCAN_WINDOW_LOWER_LIMIT = Term("MS:1000501")
+  val SCAN_WINDOW_UPPER_LIMIT = Term("MS:1000500")
   val SELECTED_ION_MZ = Term("MS:1000744")
 
   val CID = Term("MS:1000133")

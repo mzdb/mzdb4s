@@ -27,17 +27,15 @@ object RawFileParserWrapper extends IRawFileParserWrapper with com.github.mzdb4s
 
     Zone { implicit z =>
 
-      val rawFileParserAbsDirAsCStr = CUtils.toCString(rawFileParserAbsDir)
-
       // C# DLL location
-      bindings.MonoEmbeddinator.mono_embeddinator_set_assembly_path(rawFileParserAbsDirAsCStr)
+      bindings.MonoEmbeddinator.mono_embeddinator_set_assembly_path(CUtils.toCString(rawFileParserAbsDir))
 
-      // Mono runtime location
-      if (Platform.isWindows) {
-        bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(rawFileParserAbsDirAsCStr)
-      } else {
-        bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(c"/usr/lib/")
-      }
+      // Define Mono runtime location (add an extra slash on Linux)
+      val runtimeAssemblyPath = if (Platform.isWindows) rawFileParserAbsDir else this.getMonoRuntimeAssemblyPath() + "/"
+      assert(new File(runtimeAssemblyPath,"mono").isDirectory, s"can't find mono runtime at '$runtimeAssemblyPath'")
+
+      // Set Mono runtime location
+      bindings.MonoEmbeddinator.mono_embeddinator_set_runtime_assembly_path(CUtils.toCString(runtimeAssemblyPath))
     }
 
     _isInitialized = true

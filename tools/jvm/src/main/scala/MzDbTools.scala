@@ -7,7 +7,7 @@ import quickxml.QuickXmlEnv
 import com.github.mzdb4s.io.thermo.RawFileParserEnv
 import com.github.mzdb4s.io.writer.MzDbWriter
 
-object MzDbTools extends AbstractMzDbTools  {
+object MzDbTools extends com.github.mzdb4s.AbstractMzDbTools  {
 
   // Configure english locale
   java.util.Locale.setDefault(java.util.Locale.ENGLISH)
@@ -72,7 +72,9 @@ object MzDbTools extends AbstractMzDbTools  {
     @arg(short = 'o', name = "mzdb", doc = "Path to the mzDB output file")
     mzdbOpt: Option[String],
     @arg(short = 's', name = "split-faims", doc = "Split RAW file in multiple mzDB files (for each FAIMS CV value)")
-    splitFaims: Flag
+    splitFaims: Flag,
+    @arg(short = 'w', name = "merge-wisim-spectra", doc = "Merge consecutive WiSIM spectra into a single MS1 spectrum")
+    mergeWiSimSpectra: Flag
   ): Unit = {
 
     _cconfigureNativeLibsForThermoConversion()
@@ -96,11 +98,12 @@ object MzDbTools extends AbstractMzDbTools  {
       // Create the list of command arguments
       val commandArgs = ListBuffer(s"$jarDir/mzdbtools","thermo2mzdb","-i",raw,"-o",mzdbOpt.getOrElse(raw + ".mzDB"))
       if (splitFaims.value) commandArgs += "--split-faims"
+      if (mergeWiSimSpectra.value) commandArgs += "--merge-wisim-spectra"
 
       // Execute mzdbtools
       Process(commandArgs.mkString(" "),None,("LD_LIBRARY_PATH",ldLibPath)).!
     } else {
-      this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"), splitFaims.value)
+      this._thermo2mzdb(raw,mzdbOpt.getOrElse(raw + ".mzDB"), splitFaims.value, mergeWiSimSpectra.value)
     }
   }
 

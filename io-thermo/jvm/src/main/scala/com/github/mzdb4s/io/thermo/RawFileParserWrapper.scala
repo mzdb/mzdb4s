@@ -65,12 +65,12 @@ object RawFileParserWrapper extends IRawFileParserWrapper with com.github.mzdb4s
     // C# DLL location
     runtimeLibrary.mono_embeddinator_set_assembly_path(rawFileParserAbsDir)
 
-    // Mono runtime location
-    if (Platform.isWindows) {
-      runtimeLibrary.mono_embeddinator_set_runtime_assembly_path(rawFileParserAbsDir)
-    } else {
-      runtimeLibrary.mono_embeddinator_set_runtime_assembly_path("/usr/lib/")
-    }
+    // Define Mono runtime location
+    val runtimeAssemblyPath = if (Platform.isWindows) rawFileParserAbsDir else this.getMonoRuntimeAssemblyPath()
+    assert(new File(runtimeAssemblyPath,"mono").isDirectory, s"can't find mono runtime at '$runtimeAssemblyPath'")
+
+    // Set Mono runtime location
+    runtimeLibrary.mono_embeddinator_set_runtime_assembly_path(runtimeAssemblyPath)
 
     // Replace the RuntimeLibrary.ErrorCallback by a custom version to retrieve the C# exception stack traces
     // FIXME: perform this fix directly in Embeddinator (submit a PR)

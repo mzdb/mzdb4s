@@ -5,12 +5,12 @@ case class TimsDataReaderConfig(
   mzTolPPM: Int,
   minDataPointsCount: Int,
   nThreads: Int,
-  nTimsdataDllThreads: Int,
+  nTimsdataDllThreads: Int
 )
 
 trait ITimsDataReader {
 
-  type ForEachMergedSpectrumCb = (Long, Int, Int, Array[Double], Array[Float]) => Unit
+  type ForEachMergedSpectrumCb = (Long, Int, Int, Int, IndexedSeq[Double], IndexedSeq[Float]) => Unit
 
   //def forEachMergedSpectrum(timsDataDir: String, onEachMergedSpectrum: ForEachMergedSpectrumCb): Unit
 

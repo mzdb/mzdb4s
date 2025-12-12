@@ -3,10 +3,8 @@ package com.github.mzdb4s.msdata
 import java.util
 
 import scala.beans.BeanProperty
-import scala.collection.Seq
+import scala.collection.IndexedSeq
 import com.github.mzdb4s.util.ms.MsUtils
-
-import scala.collection.mutable.WrappedArray
 
 trait ISpectrumDataContainer extends Any {
   def getMzAt(index: Int): Double
@@ -23,10 +21,10 @@ trait ISpectrumDataContainer extends Any {
 
 trait ISpectrumData extends ISpectrumDataContainer {
   // Methods to be implemented
-  def mzList: Array[Double]
-  def intensityList: Array[Float]
-  def leftHwhmList: Array[Float]
-  def rightHwhmList: Array[Float]
+  def mzList: IndexedSeq[Double]
+  def intensityList: IndexedSeq[Float]
+  def leftHwhmList: IndexedSeq[Float]
+  def rightHwhmList: IndexedSeq[Float]
   def peaksCount: Int
   //def toPeaks[T <: IPeak](lcContext: ILcContext): Array[T]
   def toPeaks(lcContext: ILcContext): Array[IPeak]
@@ -82,18 +80,24 @@ case class SpectrumData(
 ) extends AbstractSpectrumData {
  */
 
-case class SpectrumData(
+/*case class SpectrumData(
   @BeanProperty mzList: Array[Double],
   @BeanProperty intensityList: Array[Float],
   @BeanProperty leftHwhmList: Array[Float],
   @BeanProperty rightHwhmList: Array[Float]
+)*/
+case class SpectrumData(
+  @BeanProperty mzList: IndexedSeq[Double],
+  @BeanProperty intensityList: IndexedSeq[Float],
+  @BeanProperty leftHwhmList: IndexedSeq[Float],
+  @BeanProperty rightHwhmList: IndexedSeq[Float]
 ) extends AbstractSpectrumData {
   require(mzList != null, "mzList is null")
   require(intensityList != null, "intensityList is null")
 
   val peaksCount: Int = mzList.length
 
-  def this(mzList: Array[Double], intensityList: Array[Float]) {
+  def this(mzList: IndexedSeq[Double], intensityList: IndexedSeq[Float]) {
     this(mzList, intensityList, null, null)
   }
 
@@ -162,111 +166,164 @@ case class SpectrumData(
     this.peaksCount = newLength
   }*/
 
+  /** assuming mzList is sorted */
+  import scala.collection.Searching._
+  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): IPeak = {
+    if (peaksCount == 0) return null
 
-  private def _binSearchIndexToNearestIndex(binSearchIndex: Int): Int = {
+    /*
+    val binSearchIndex = util.Arrays.binarySearch(myMzList, mz)
+    val idx = if (binSearchIndex < 0) ~binSearchIndex else binSearchIndex
+    */
+
+    val nearestIdx = this.getNearestPeakIndex(mz: Double, mzTolPPM: Double)
+    if (nearestIdx == -1) return null
+
+    if (leftHwhmList != null && rightHwhmList != null) {
+      Peak(
+        this.mzList(nearestIdx),
+        this.intensityList(nearestIdx),
+        this.leftHwhmList(nearestIdx),
+        this.rightHwhmList(nearestIdx),
+        lcContext)
+    }
+    else {
+      val peak = new Peak(this.mzList(nearestIdx), this.intensityList(nearestIdx))
+      peak.setLcContext(lcContext)
+      peak
+    }
+  }
+
+  // Returns -1 if empty spectrum
+  def getNearestPeakIndex(mz: Double): Int = {
+    if (peaksCount == 0) return -1
+
+    /*var idx = util.Arrays.binarySearch(myMzList, mz)
+    idx = if (idx < 0) ~idx else idx
+
+    val maxIdx = this.peaksCount - 1
+    var minDiff = Double.MaxValue // difference to minimize
+    var k = Math.max(0, idx - 1)
+    while (k <= Math.min(maxIdx, idx + 1)) {
+      val mzDiff = Math.abs(myMzList(k) - mz)
+      if (mzDiff < minDiff) {
+        minDiff = mzDiff
+        idx = k
+      }
+      k += 1
+    }
+    */
+
+    _binarySearchResultToNearestIndex(this.mzList.search(mz), mz)
+  }
+
+  private def _binarySearchResultToNearestIndex(searchResult: SearchResult, mz: Double): Int = {
+    val myMzList = this.mzList
+
+    searchResult match {
+      case Found(index) => index
+      case InsertionPoint(idx) => {
+        if (idx == 0) idx
+        else if (idx == peaksCount) idx - 1
+        else {
+          val prevVal = myMzList(idx - 1)
+          val nextVal = myMzList(idx)
+          val diffPrevVal = Math.abs(mz - prevVal)
+          val diffNextVal = Math.abs(mz - nextVal)
+          if (diffNextVal < diffPrevVal) idx else idx - 1
+        }
+      }
+    }
+  }
+
+  /*private def _binSearchIndexToNearestIndex(binSearchIndex: Int): Int = {
     if (binSearchIndex >= 0) binSearchIndex
     else {
       val idx = -binSearchIndex - 1
       if (idx == 0) -1
       else idx
     }
+  }*/
+
+  private def _binarySearchResultToIndex(searchResult: SearchResult): Int = {
+    searchResult match {
+      case Found(index) => index
+      case InsertionPoint(index) => index
+    }
   }
 
-  /** assuming mzList is sorted */
-  def getNearestPeak(mz: Double, mzTolPPM: Double, lcContext: ILcContext): IPeak = {
-    if (peaksCount == 0) return null
+  // Returns -1 if no match
+  @inline
+  def getNearestPeakIndex(mz: Double, mzTolPPM: Double): Int = {
+    if (peaksCount == 0) return -1
 
     val myMzList = this.mzList
     val mzDa = MsUtils.ppmToDa(mz, mzTolPPM)
+
+    /*
     val binSearchIndex = util.Arrays.binarySearch(myMzList, mz)
-    /*if (binSearchIndex >= 0) {
-          System.out.println("data found");
-        }*/
 
-    val idx = if (binSearchIndex >= 0) binSearchIndex
-    else -binSearchIndex - 1
+    val idx = if (binSearchIndex < 0) ~binSearchIndex else binSearchIndex
+    */
 
-    var prevVal = 0.0
-    var nextVal = 0.0
-    var newIdx = 0
-    if (idx == peaksCount) {
-      prevVal = myMzList(peaksCount - 1)
-      if (Math.abs(mz - prevVal) > mzDa) return null
-      newIdx = idx - 1
-    }
-    else if (idx == 0) { // System.out.println("idx == zero");
-      nextVal = myMzList(idx)
-      if (Math.abs(mz - nextVal) > mzDa) return null
-      newIdx = idx
-      // System.out.println(""+ this.mzList[idx] +", "+ mz);
-    }
-    else {
-      nextVal = myMzList(idx)
-      prevVal = myMzList(idx - 1)
-      val diffNextVal = Math.abs(mz - nextVal)
-      val diffPrevVal = Math.abs(mz - prevVal)
-      if (diffNextVal < diffPrevVal) {
-        if (diffNextVal > mzDa) return null
-        newIdx = idx
+    val nearestIdx = myMzList.search(mz) match {
+      case Found(index) => index
+      case InsertionPoint(idx) => {
+        // Refine the search to find the closest m/z value
+        var newIdx = 0
+        if (idx == peaksCount) {
+          val prevVal = myMzList(peaksCount - 1)
+          if (Math.abs(mz - prevVal) > mzDa) return -1
+          newIdx = idx - 1
+        }
+        else if (idx == 0) { // System.out.println("idx == zero");
+          val nextVal = myMzList(idx)
+          if (Math.abs(mz - nextVal) > mzDa) return -1
+          newIdx = idx
+          // System.out.println(""+ this.mzList[idx] +", "+ mz);
+        }
+        else {
+          val prevVal = myMzList(idx - 1)
+          val nextVal = myMzList(idx)
+          val diffPrevVal = Math.abs(mz - prevVal)
+          val diffNextVal = Math.abs(mz - nextVal)
+          if (diffNextVal < diffPrevVal) {
+            if (diffNextVal > mzDa) return -1
+            newIdx = idx
+          }
+          else {
+            if (diffPrevVal > mzDa) return -1
+            newIdx = idx - 1
+          }
+        }
+
+        newIdx
       }
-      else {
-        if (diffPrevVal > mzDa) return null
-        newIdx = idx - 1
-      }
     }
 
-    if (leftHwhmList != null && rightHwhmList != null) {
-      Peak(myMzList(newIdx), this.intensityList(newIdx), this.leftHwhmList(newIdx), this.rightHwhmList(newIdx), lcContext)
-    }
-    else {
-      val peak = new Peak(myMzList(newIdx), this.intensityList(newIdx))
-      peak.setLcContext(lcContext)
-      peak
-    }
-  }
+    nearestIdx
 
-  def getNearestPeakIndex(value: Double): Int = {
-    val myMzList = this.mzList
-    var idx = util.Arrays.binarySearch(myMzList, value)
-    idx = if (idx < 0) ~idx else idx
-
-    var min = Double.MaxValue
-    var k = Math.max(0, idx - 1)
-    while (k <= Math.min(this.peaksCount - 1, idx + 1)) {
-      if (Math.abs(myMzList(k) - value) < min) {
-        min = Math.abs(myMzList(k) - value)
-        idx = k
-      }
-      k += 1
-    }
-
-    idx
-  }
-
-  def getPeakIndex(value: Double, ppmTol: Double): Int = {
-    val myMzList = this.mzList
-    var idx = util.Arrays.binarySearch(myMzList, value)
+    /*var idx = util.Arrays.binarySearch(myMzList, mz)
     idx = if (idx < 0) ~idx else idx
 
     var min = Double.MaxValue
     var resultIdx = -1
     var k = Math.max(0, idx - 1)
     while (k <= Math.min(this.peaksCount - 1, idx + 1)) {
-      if ((1e6 * Math.abs(myMzList(k) - value) / value < ppmTol) && (Math.abs(myMzList(k) - value) < min)) {
-        min = Math.abs(myMzList(k) - value)
+      if ((1e6 * Math.abs(myMzList(k) - mz) / mz < ppmTol) && (Math.abs(myMzList(k) - mz) < min)) {
+        min = Math.abs(myMzList(k) - mz)
         resultIdx = k
       }
       k += 1
     }
 
-    resultIdx
+    resultIdx*/
   }
 
   def mzRangeFilter(minMz: Double, maxMz: Double): SpectrumData = {
     require(minMz <= maxMz, "maxMz can be lower than minMz")
 
-    val nbPoints = peaksCount
-    val myMzList = this.mzList
+    /*val nbPoints = peaksCount
 
     // Retrieve the index of nearest minimum value if it exists
     val minBinSearchIndex = util.Arrays.binarySearch(myMzList, minMz)
@@ -281,18 +338,29 @@ case class SpectrumData(
     val lastIdx = this._binSearchIndexToNearestIndex(maxBinSearchIndex)
     // If first index => return empty spectrum data
     if (lastIdx == -1) return null
+    */
+
+    // Retrieve the index of nearest minimum value if it exists
+    val firstIdx = _binarySearchResultToIndex(this.mzList.search(minMz))
+    if (firstIdx == peaksCount) return null
+
+    // Retrieve the index of nearest maximum value if it exists
+    val lastIdx = _binarySearchResultToIndex(
+      this.mzList.search(maxMz, firstIdx, peaksCount)
+    )
+    if (lastIdx == 0 && this.mzList(0) > maxMz) return null
 
     val filteredSpectrumData = if (this.leftHwhmList == null || this.rightHwhmList == null) {
       new SpectrumData(
-        util.Arrays.copyOfRange(myMzList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.intensityList, firstIdx, lastIdx)
+        this.mzList.slice(firstIdx, lastIdx),
+        this.intensityList.slice(firstIdx, lastIdx)
       )
     } else {
       new SpectrumData(
-        util.Arrays.copyOfRange(myMzList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.intensityList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.leftHwhmList, firstIdx, lastIdx),
-        util.Arrays.copyOfRange(this.rightHwhmList, firstIdx, lastIdx)
+        this.mzList.slice(firstIdx, lastIdx),
+        this.intensityList.slice(firstIdx, lastIdx),
+        this.leftHwhmList.slice(firstIdx, lastIdx),
+        this.rightHwhmList.slice(firstIdx, lastIdx)
       )
     }
 

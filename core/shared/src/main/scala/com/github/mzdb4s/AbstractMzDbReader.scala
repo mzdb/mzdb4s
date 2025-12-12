@@ -568,7 +568,9 @@ abstract class AbstractMzDbReader {
     maxMz: Double,
     method: XicMethod.Value
   )(implicit mzDbCtx: MzDbContext): Array[IPeak] = {
-    this.getMsXic(minMz, maxMz, -1, -1, method)
+    val mzCenter = (minMz + maxMz) / 2
+    val mzTolInDa = maxMz - mzCenter
+    this.getMsXic(mzCenter, mzTolInDa, -1, -1, method)
   }
 
   protected def getMsXicInMzRtRanges(

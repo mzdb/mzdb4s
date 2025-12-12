@@ -6,7 +6,7 @@ import scala.scalanative.libc.string
 import scala.scalanative.unsafe._
 
 import com.github.sqlite4s._
-import com.github.sqlite4s.bindings.sqlite_addons.DESTRUCTOR_TYPE._
+import com.github.sqlite4s.bindings.DESTRUCTOR_TYPE._
 
 import com.github.mzdb4s.db.model.MzDbMetaData
 import com.github.mzdb4s.msdata._

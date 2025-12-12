@@ -1,6 +1,6 @@
 package com.github.mzdb4s.io.mgf
 
-object MgfField extends Enumeration {
+object MgfField extends com.github.mzdb4s.util.lang.EnhancedEnum {
   val BEGIN_IONS = Value("BEGIN IONS")
   val END_IONS = Value("END IONS")
   val TITLE, PEPMASS, CHARGE, ION_MOBILITY, RTINSECONDS, RAWSCANS, SCANS = Value

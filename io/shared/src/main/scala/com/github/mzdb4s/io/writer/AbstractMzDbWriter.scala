@@ -63,6 +63,10 @@ abstract class AbstractMzDbWriter extends Logging {
     */
   def getConnection(): ISQLiteConnection = this._connection
 
+  def setInsertedSpectraCount(spectraCount: Int): Unit = {
+    this._insertedSpectraCount = spectraCount
+  }
+
   def open(): Unit = {
     this._connection = sf.newSQLiteConnection(dbLocation)
     this._connection.open(allowCreate = true) // allow create => true

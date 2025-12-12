@@ -12,21 +12,27 @@ object TimsDataReader extends ITimsDataReader {
     val nullCbContext: Pointer = null
     val errMsgPtr = new PointerByReference()//Memory.allocateDirect(runtime, 1024)
 
-    val closure: OnEachFrameCallback = (frameId: Long, firstScan: Int, lastScan: Int, mzValuesPtr: Pointer, intensityValuesPtr: Pointer, peaksCount: Int, context: Pointer) => {
-      //println("peaksCount: " + peaksCount)
+    val rc = if (config.isEmpty) {
+      val closure: OnEachFrameCallback = (frameId: Long, firstScan: Int, lastScan: Int, mzValuesPtr: Pointer, intensityValuesPtr: Pointer, peaksCount: Int, context: Pointer) => {
 
-      val mzValues = new Array[Double](peaksCount)
-      val intensityValues = new Array[Float](peaksCount)
+        try {
+         // println("peaksCount in JVM CB: " + peaksCount)
+          val mzValues = new Array[Double](peaksCount)
+          val intensityValues = new Array[Float](peaksCount)
 
-      for (i <- 0 until peaksCount) {
-        mzValues(i) = mzValuesPtr.getDouble(i * 8)
-        intensityValues(i) = intensityValuesPtr.getFloat(i * 4)
+          for (i <- 0 until peaksCount) {
+            mzValues(i) = mzValuesPtr.getDouble(i * 8)
+            intensityValues(i) = intensityValuesPtr.getFloat(i * 4)
+          }
+
+          onEachMergedSpectrum(frameId, firstScan, lastScan, -1, mzValues, intensityValues)
+        } catch {
+          case t: Throwable => {
+            System.err.println("An error occurred within the callback of timsreader_for_each_merged_frame: " + t.getMessage)
+          }
+        }
       }
 
-      onEachMergedSpectrum(frameId, firstScan, lastScan, mzValues, intensityValues)
-    }
-
-    val rc = if (config.isEmpty) {
       rustLib.timsreader_for_each_merged_spectrum(
         timsDataDir,
         nullCbContext,
@@ -34,6 +40,27 @@ object TimsDataReader extends ITimsDataReader {
         errMsgPtr
       )
     } else {
+      val closure: OnEachFrameCallbackV2 = (frameId: Long, firstScan: Int, lastScan: Int, spectrumIdx: Int,
+                                            mzValuesPtr: Pointer, intensityValuesPtr: Pointer, peaksCount: Int, context: Pointer) => {
+        try {
+          //println("peaksCount: " + peaksCount)
+
+          val mzValues = new Array[Double](peaksCount)
+          val intensityValues = new Array[Float](peaksCount)
+
+          for (i <- 0 until peaksCount) {
+            mzValues(i) = mzValuesPtr.getDouble(i * 8)
+            intensityValues(i) = intensityValuesPtr.getFloat(i * 4)
+          }
+
+          onEachMergedSpectrum(frameId, firstScan, lastScan, spectrumIdx, mzValues, intensityValues)
+        } catch {
+          case t: Throwable => {
+            System.err.println("An error occurred within the callback of timsreader_for_each_merged_spectrum_v2: " + t.getMessage)
+          }
+        }
+      }
+
       val configAsStruct = new TimsDataReaderConfigAsStruct(config.get, TimsReaderLibraryFactory.getRuntime())
       rustLib.timsreader_for_each_merged_spectrum_v2(
         timsDataDir,

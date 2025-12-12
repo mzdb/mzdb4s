@@ -57,6 +57,7 @@ object RawFileParserEnv {
       _extractLibrary("windows/mono-2.0-sgen.dll", outputDir, isTempDir)
       _extractLibrary("windows/ThermoRawFileParser.dll", outputDir, isTempDir)
     } else if (Platform.isLinux) {
+      // Are we sure this works? Should we replace "linux" by "linux-x86-64"?
       _extractLibrary("linux/libmonosgen-2.0.so", outputDir, isTempDir)
       _extractLibrary("linux/libThermoRawFileParser.so", outputDir, isTempDir)
     } else {

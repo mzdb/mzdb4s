@@ -7,12 +7,12 @@ lazy val supportedScalaVersions = List(scala213, scala212)
 
 val sharedSettings = Seq(
   organization := "com.github.mzdb",
-  version := "0.4.5",
+  version := "0.4.5.1",
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
 
   libraryDependencies ++= Seq(
-    "com.outr" %%% "scribe" % "3.6.2", // TODO: upgrade to 3.11.1 or latest
+    "com.outr" %%% "scribe" % "3.11.5",
     "com.lihaoyi" %%% "utest" % "0.8.1" % Test
   ),
 
@@ -76,7 +76,7 @@ lazy val mzdb4sCore = crossProject(JVMPlatform, NativePlatform)
       nativeMode := "debug",
 
       libraryDependencies ++= Seq(
-        "com.github.david-bouyssie" %%% "sqlite4s" % "0.4.1"
+        "com.github.david-bouyssie" %%% "sqlite4s" % "0.5.0"
       )
     ),
 
